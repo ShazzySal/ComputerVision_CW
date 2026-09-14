@@ -22,3 +22,6 @@ content/
 # OS
 Thumbs.db
 .DS_Store
+
+# Local spreadsheets
+*.xlsx
