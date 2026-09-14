@@ -40,9 +40,15 @@ class AppConfig:
 # Preprocessing
 # ─────────────────────────────────────────────────────────────────────────────
 def crop_image_from_gray(img: np.ndarray, threshold: int = 7, tol: int = 7) -> np.ndarray:
+    """Strips non-informative circular black optical border artifacts from fundus photographs.
+    
+    Medical Rationale: Fundus cameras project a circular field onto a rectangular sensor.
+    Surrounding black pixels contribute zero diagnostic information while distorting pooling statistics.
+    """
     if img.ndim == 2:
         mask = img > threshold
     else:
+        # Green channel offers highest contrast for retinal microvasculature
         mask = img[:, :, 1] > threshold
 
     if not mask.any():
@@ -63,6 +69,10 @@ def crop_image_from_gray(img: np.ndarray, threshold: int = 7, tol: int = 7) -> n
 
 
 def ben_graham_enhance(img: np.ndarray) -> np.ndarray:
+    """Applies Ben Graham's spatial illumination normalization filter:
+    I_norm = alpha * I + beta * (GaussianFilter(I, sigma=10)) + gamma
+    Subtracts local Gaussian blur to remove lighting variations and vignetting.
+    """
     ksize = int(2 * round(4 * AppConfig.BEN_GRAHAM_SIGMA) + 1)
     blurred = cv2.GaussianBlur(img, (ksize, ksize), AppConfig.BEN_GRAHAM_SIGMA)
     enhanced = cv2.addWeighted(
@@ -74,6 +84,10 @@ def ben_graham_enhance(img: np.ndarray) -> np.ndarray:
 
 
 def preprocess_image(image_input: Union[str, np.ndarray]) -> np.ndarray:
+    """Complete 5-step clinical preprocessing:
+    1. RGB conversion -> 2. Border cropping -> 3. Anti-aliased resize ->
+    4. Ben Graham enhancement -> 5. Scaling to [0.0, 1.0] float32 tensor.
+    """
     if isinstance(image_input, str):
         bgr = cv2.imread(image_input)
         if bgr is None:
@@ -94,6 +108,10 @@ def preprocess_image(image_input: Union[str, np.ndarray]) -> np.ndarray:
 # Model Construction
 # ─────────────────────────────────────────────────────────────────────────────
 def build_classifier():
+    """Constructs the primary 5-stage EfficientNetB3 classification model.
+    Topology: Input(224x224x3) -> EfficientNetB3 Base -> GAP -> BN -> Dense(256) -> Dropout(0.3) -> Softmax(5).
+    Loads pre-trained fine-tuned weights from WEIGHTS_PATH if present.
+    """
     base_m = EfficientNetB3(
         include_top=False, weights="imagenet",
         input_shape=(AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3)
@@ -118,7 +136,7 @@ def build_classifier():
 
 full_model, base_model = build_classifier()
 
-# Build Grad-CAM model
+# Build Grad-CAM model: taps top_activation layer of base EfficientNetB3
 conv_layer = base_model.get_layer("top_activation")
 base_sub = keras.Model(inputs=base_model.inputs, outputs=[conv_layer.output, base_model.output])
 cam_in = keras.Input(shape=(AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3))
@@ -130,12 +148,14 @@ x_cam = full_model.get_layer("head_dropout")(x_cam)
 p_cam = full_model.get_layer("predictions")(x_cam)
 gradcam_model = keras.Model(inputs=cam_in, outputs=[c_out, p_cam])
 
-# Build penultimate embedding model
+# Build penultimate embedding extractor (256-D) for Case-Based Reasoning
 embedding_extractor = keras.Model(inputs=full_model.input, outputs=full_model.get_layer("head_dense").output)
 
 
-# Build Auxiliary U-Net (Idea #3)
 def build_auxiliary_unet():
+    """Constructs the auxiliary symmetrical U-Net architecture for Layer 3 pixel lesion segmentation.
+    Topology: Encoder (2 blocks) -> Bottleneck (128 filters) -> Decoder with skip connections -> Sigmoid(1).
+    """
     inputs = keras.Input(shape=(AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3))
     c1 = layers.Conv2D(32, (3, 3), padding="same", activation="relu")(inputs)
     p1 = layers.MaxPooling2D((2, 2))(c1)
@@ -155,8 +175,8 @@ def build_auxiliary_unet():
 unet_model = build_auxiliary_unet()
 
 
-# Load reference embeddings
 def load_reference_embeddings():
+    """Loads pre-cached training embeddings from EMBEDDINGS_PATH or synthesizes demo cases for offline exploration."""
     if os.path.exists(AppConfig.EMBEDDINGS_PATH):
         try:
             data = np.load(AppConfig.EMBEDDINGS_PATH, allow_pickle=True)
@@ -179,6 +199,9 @@ ref_embeddings, ref_labels, ref_fps = load_reference_embeddings()
 # Explainability Algorithms
 # ─────────────────────────────────────────────────────────────────────────────
 def compute_gradcam(img_tensor: np.ndarray, pred_index: int) -> np.ndarray:
+    """Computes Grad-CAM 2D saliency heatmap via tf.GradientTape for target class pred_index.
+    Uses pooled gradients of class logit w.r.t. top_activation feature maps.
+    """
     tensor = tf.convert_to_tensor(img_tensor[np.newaxis, ...])
     with tf.GradientTape() as tape:
         tape.watch(tensor)
@@ -197,6 +220,7 @@ def compute_gradcam(img_tensor: np.ndarray, pred_index: int) -> np.ndarray:
 
 
 def overlay_heatmap(rgb_img: np.ndarray, heatmap: np.ndarray, alpha: float = 0.4) -> np.ndarray:
+    """Superimposes normalized 2D Grad-CAM heatmap onto RGB image using Jet colormap."""
     h, w = rgb_img.shape[:2]
     heat_resized = cv2.resize(heatmap, (w, h))
     heat_uint8 = (heat_resized * 255).astype(np.uint8)
@@ -207,6 +231,9 @@ def overlay_heatmap(rgb_img: np.ndarray, heatmap: np.ndarray, alpha: float = 0.4
 
 
 def segment_retinal_lesions(preproc_img: np.ndarray, heatmap: np.ndarray, stage: int) -> np.ndarray:
+    """Layer 3 Lesion Segmentation (Idea #3): Delineates pixel-level microaneurysms
+    and exudates in fluorescent green using the auxiliary U-Net gated by Grad-CAM attention.
+    """
     base = (np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8)
     if stage == 0:
         return base
@@ -219,6 +246,9 @@ def segment_retinal_lesions(preproc_img: np.ndarray, heatmap: np.ndarray, stage:
 
 
 def generate_quadrant_description(heatmap: np.ndarray, stage: int) -> str:
+    """Calculates mean Grad-CAM activation across 4 anatomical quadrants
+    (Superior-Temporal, Superior-Nasal, Inferior-Temporal, Inferior-Nasal) and synthesizes clinical text.
+    """
     h, w = heatmap.shape
     mid_y, mid_x = h // 2, w // 2
     quadrants = {
@@ -236,6 +266,9 @@ def generate_quadrant_description(heatmap: np.ndarray, stage: int) -> str:
 
 
 def find_similar_cases(query_arr: np.ndarray, k: int = 3) -> List[Dict[str, Any]]:
+    """Innovation Feature A: Projects image to 256-D penultimate embedding space
+    and executes cosine similarity dot-product retrieval against verified historical cases.
+    """
     q_emb = embedding_extractor(query_arr[np.newaxis, ...], training=False).numpy()
     q_norm = q_emb / (np.linalg.norm(q_emb, axis=1, keepdims=True) + 1e-10)
     sims = np.dot(ref_embeddings, q_norm.T).squeeze()
@@ -258,6 +291,9 @@ def find_similar_cases(query_arr: np.ndarray, k: int = 3) -> List[Dict[str, Any]
 # Multi-Agent Pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 class DiagnosisAgent:
+    """Specialist Agent #1: Executes deep convolutional inference on preprocessed fundus
+    images and returns top predicted stage along with complete 5-class softmax distribution.
+    """
     def process(self, preproc_img: np.ndarray) -> Dict[str, Any]:
         probs = full_model(preproc_img[np.newaxis, ...], training=False).numpy()[0]
         stage = int(np.argmax(probs))
@@ -270,6 +306,10 @@ class DiagnosisAgent:
 
 
 class ExplainabilityAgent:
+    """Specialist Agent #2: Orchestrates the multi-layer explainability dossier:
+    Layer 2 Grad-CAM attention, Layer 3 U-Net lesion segmentation, anatomical quadrant
+    descriptions, and Case-Based Reasoning (CBR) retrieval.
+    """
     def process(self, preproc_img: np.ndarray, diag: Dict[str, Any]) -> Dict[str, Any]:
         stage = diag["stage"]
         heat = compute_gradcam(preproc_img, stage)
@@ -286,6 +326,10 @@ class ExplainabilityAgent:
 
 
 class AdvisoryAgent:
+    """Specialist Agent #3: Clinical Practice Advisory Engine.
+    Translates predicted stages into follow-up timelines and clinical referral actions
+    referenced from American Academy of Ophthalmology (AAO) Preferred Practice Patterns.
+    """
     GUIDANCE = {
         0: ("Routine / Annual", "No diabetic microvascular lesions observed. Maintain annual surveillance.", "12 months."),
         1: ("Non-Urgent Monitoring", "Mild NPDR (microaneurysms only). Optimize blood pressure and glucose control.", "6-9 months."),
@@ -302,6 +346,10 @@ class AdvisoryAgent:
 
 
 class GovernanceAgent:
+    """Specialist Agent #4: Active Safety Governance Gate (Innovation Feature B).
+    Inspired by military AI safety architectures. Intercepts and overrides output
+    whenever diagnostic confidence falls below the clinician threshold (default: 70%).
+    """
     def __init__(self, threshold: float = AppConfig.DEFAULT_CONFIDENCE_THRESHOLD):
         self.threshold = threshold
 
@@ -329,6 +377,7 @@ class GovernanceAgent:
 
 
 def run_pipeline(preproc_img: np.ndarray, threshold: float = AppConfig.DEFAULT_CONFIDENCE_THRESHOLD):
+    """Orchestrates sequential multi-agent clinical decision pipeline."""
     diag = DiagnosisAgent().process(preproc_img)
     expl = ExplainabilityAgent().process(preproc_img, diag)
     adv = AdvisoryAgent().process(diag["stage"])
@@ -339,6 +388,10 @@ def run_pipeline(preproc_img: np.ndarray, threshold: float = AppConfig.DEFAULT_C
 # Gradio Dashboard
 # ─────────────────────────────────────────────────────────────────────────────
 def predict_gradio(img: Optional[np.ndarray], threshold: float):
+    """Primary Gradio interface callback. Connects user-uploaded fundus images
+    and clinician threshold adjustments to the multi-agent decision pipeline,
+    formatting outputs for the 3-layer explainability dashboard.
+    """
     if img is None:
         empty = np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3), dtype=np.uint8)
         return "### ⚠️ Upload a fundus photograph.", "", empty, empty, "", []
