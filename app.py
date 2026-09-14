@@ -472,15 +472,15 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float):
     <div class="card hero-card" style="border-top: 5px solid {border_c};">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>
-                <span style="background:{bg_c}; color:{border_c}; padding:4px 10px; border-radius:20px; font-weight:700; font-size:12px; letter-spacing:0.5px;">
+                <span class="stage-badge stage-badge-{stage}" style="background:{bg_c}; color:{border_c}; padding:4px 10px; border-radius:20px; font-weight:700; font-size:12px; letter-spacing:0.5px;">
                     {badge_text}
                 </span>
-                <h1 style="margin:8px 0 4px 0; font-size:26px; color:#0f172a;">{diag['stage_name']}</h1>
-                <p style="margin:0; color:#64748b; font-size:13px;">ICDR Severity Scale • Primary Diagnostic Output</p>
+                <h1 class="hero-stage-title" style="margin:8px 0 4px 0; font-size:26px;">{diag['stage_name']}</h1>
+                <p class="hero-subtext" style="margin:0; font-size:13px;">ICDR Severity Scale • Primary Diagnostic Output</p>
             </div>
             <div style="text-align:right;">
                 <div style="font-size:32px; font-weight:800; color:{border_c};">{diag['confidence']*100:.1f}%</div>
-                <div style="font-size:12px; color:#64748b; font-weight:600;">CONFIDENCE SCORE</div>
+                <div class="hero-sublabel" style="font-size:12px; font-weight:600;">CONFIDENCE SCORE</div>
             </div>
         </div>
     </div>
@@ -498,22 +498,22 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float):
     # 5. Clinical Advisory Plan HTML
     advisory_html = f"""
     <div class="card">
-        <h3 style="margin-top:0; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">📋 Clinical Care Protocol (AAO Preferred Practice Pattern)</h3>
+        <h3 class="protocol-title" style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">📋 Clinical Care Protocol (AAO Preferred Practice Pattern)</h3>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
-            <div style="padding:10px; background:#f8fafc; border-radius:6px;">
-                <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Clinical Urgency Level</div>
-                <div style="font-size:15px; font-weight:700; color:#0f172a; margin-top:2px;">{adv['urgency']}</div>
+            <div class="protocol-box" style="padding:10px; border-radius:6px;">
+                <div class="protocol-label" style="font-size:11px; font-weight:700; text-transform:uppercase;">Clinical Urgency Level</div>
+                <div class="protocol-val" style="font-size:15px; font-weight:700; margin-top:2px;">{adv['urgency']}</div>
             </div>
-            <div style="padding:10px; background:#f8fafc; border-radius:6px;">
-                <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Recommended Follow-Up</div>
-                <div style="font-size:15px; font-weight:700; color:#0f172a; margin-top:2px;">{adv['followup']}</div>
+            <div class="protocol-box" style="padding:10px; border-radius:6px;">
+                <div class="protocol-label" style="font-size:11px; font-weight:700; text-transform:uppercase;">Recommended Follow-Up</div>
+                <div class="protocol-val" style="font-size:15px; font-weight:700; margin-top:2px;">{adv['followup']}</div>
             </div>
         </div>
-        <div style="padding:12px; background:#f1f5f9; border-radius:6px; margin-bottom:12px;">
-            <div style="font-size:11px; font-weight:700; color:#475569; text-transform:uppercase;">Specialist Action Plan</div>
-            <div style="font-size:13.5px; color:#1e293b; margin-top:4px; line-height:1.5;">{adv['plan']}</div>
+        <div class="action-box" style="padding:12px; border-radius:6px; margin-bottom:12px;">
+            <div class="action-label" style="font-size:11px; font-weight:700; text-transform:uppercase;">Specialist Action Plan</div>
+            <div class="action-val" style="font-size:13.5px; margin-top:4px; line-height:1.5;">{adv['plan']}</div>
         </div>
-        <div style="font-size:11.5px; color:#94a3b8; font-style:italic;">
+        <div class="disclaimer-text" style="font-size:11.5px; font-style:italic;">
             {adv['disclaimer']}
         </div>
     </div>
@@ -564,6 +564,7 @@ CUSTOM_CSS = """
 .gradio-container {
     max-width: 1280px !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Header Telemetry Styling */
@@ -579,6 +580,11 @@ CUSTOM_CSS = """
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
+    border: 1px solid #1e293b;
+}
+.dark .telemetry-bar {
+    background: #020617;
+    border: 1px solid #1e293b;
 }
 .telemetry-badge {
     display: inline-flex;
@@ -604,7 +610,7 @@ CUSTOM_CSS = """
     100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
-/* Card Styling */
+/* Base Card Styling */
 .card {
     background: #ffffff;
     border-radius: 10px;
@@ -612,7 +618,16 @@ CUSTOM_CSS = """
     border: 1px solid #e2e8f0;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     margin-bottom: 12px;
+    color: #1e293b;
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
+.dark .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    color: #f1f5f9;
+}
+
 .card-header {
     display: flex;
     align-items: center;
@@ -621,21 +636,153 @@ CUSTOM_CSS = """
 .icon {
     font-size: 24px;
 }
+
+/* Alert, Success, Warning Cards */
 .success-card {
     background: #f0fdf4;
     border: 1px solid #bbf7d0;
 }
+.dark .success-card {
+    background: #064e3b;
+    border: 1px solid #059669;
+}
 .alert-card {
     background: #fef2f2;
     border: 1px solid #fecaca;
+}
+.dark .alert-card {
+    background: #450a0a;
+    border: 1px solid #dc2626;
 }
 .warning-card {
     background: #fffbeb;
     border: 1px solid #fde68a;
     color: #92400e;
 }
+.dark .warning-card {
+    background: #451a03;
+    border: 1px solid #d97706;
+    color: #fef3c7;
+}
+
+/* Hero Diagnostic Card */
 .hero-card {
     background: #ffffff;
+}
+.dark .hero-card {
+    background: #1e293b;
+}
+.hero-stage-title {
+    color: #0f172a;
+}
+.dark .hero-stage-title {
+    color: #f8fafc;
+}
+.hero-subtext, .hero-sublabel {
+    color: #64748b;
+}
+.dark .hero-subtext, .dark .hero-sublabel {
+    color: #94a3b8;
+}
+
+/* Stage Badge Dark Mode Overrides */
+.dark .stage-badge-0 { background: rgba(16, 185, 129, 0.2) !important; color: #34d399 !important; }
+.dark .stage-badge-1 { background: rgba(2, 132, 199, 0.2) !important; color: #38bdf8 !important; }
+.dark .stage-badge-2 { background: rgba(217, 119, 6, 0.2) !important; color: #fbbf24 !important; }
+.dark .stage-badge-3 { background: rgba(234, 88, 12, 0.2) !important; color: #fb923c !important; }
+.dark .stage-badge-4 { background: rgba(225, 29, 72, 0.2) !important; color: #f87171 !important; }
+
+/* Protocol Section */
+.protocol-title {
+    color: #0f172a;
+    border-bottom: 1px solid #e2e8f0;
+}
+.dark .protocol-title {
+    color: #f8fafc;
+    border-bottom: 1px solid #334155;
+}
+.protocol-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+.dark .protocol-box {
+    background: #0f172a;
+    border: 1px solid #334155;
+}
+.protocol-label {
+    color: #64748b;
+}
+.dark .protocol-label {
+    color: #94a3b8;
+}
+.protocol-val {
+    color: #0f172a;
+}
+.dark .protocol-val {
+    color: #f8fafc;
+}
+.action-box {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+}
+.dark .action-box {
+    background: #0f172a;
+    border: 1px solid #334155;
+}
+.action-label {
+    color: #475569;
+}
+.dark .action-label {
+    color: #94a3b8;
+}
+.action-val {
+    color: #1e293b;
+}
+.dark .action-val {
+    color: #f1f5f9;
+}
+.disclaimer-text {
+    color: #94a3b8;
+}
+.dark .disclaimer-text {
+    color: #64748b;
+}
+
+/* Header Text */
+.header-title {
+    color: #0f172a;
+}
+.dark .header-title {
+    color: #f8fafc;
+}
+.header-subtitle {
+    color: #475569;
+}
+.dark .header-subtitle {
+    color: #94a3b8;
+}
+
+/* Theme Toggle Button */
+.theme-toggle-btn {
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    background: #1e293b !important;
+    color: #f8fafc !important;
+    border: 1px solid #475569 !important;
+}
+.theme-toggle-btn:hover {
+    background: #334155 !important;
+    transform: translateY(-1px);
+}
+.dark .theme-toggle-btn {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+}
+.dark .theme-toggle-btn:hover {
+    background: #e2e8f0 !important;
 }
 
 /* Button & Tool Enhancements */
@@ -652,32 +799,72 @@ CUSTOM_CSS = """
 </style>
 """
 
+HEAD_SCRIPT = """
+<script>
+(function() {
+    try {
+        const savedTheme = localStorage.getItem('retinaguard_theme');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+            document.documentElement.classList.add('dark');
+            document.body.classList.add('dark');
+            const elApp = document.querySelector('gradio-app');
+            if (elApp) elApp.classList.add('dark');
+        }
+    } catch(e) {}
+})();
+</script>
+"""
+
+THEME_TOGGLE_JS = """
+() => {
+    const elApp = document.querySelector('gradio-app');
+    const isDark = document.documentElement.classList.contains('dark') 
+                || document.body.classList.contains('dark')
+                || (elApp && elApp.classList.contains('dark'));
+    const targets = [document.documentElement, document.body];
+    if (elApp) targets.push(elApp);
+    
+    if (isDark) {
+        targets.forEach(t => t.classList.remove('dark'));
+        try { localStorage.setItem('retinaguard_theme', 'light'); } catch(e) {}
+    } else {
+        targets.forEach(t => t.classList.add('dark'));
+        try { localStorage.setItem('retinaguard_theme', 'dark'); } catch(e) {}
+    }
+}
+"""
+
 theme = gr.themes.Soft(primary_hue="teal", secondary_hue="slate")
 
 with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
-    # Inject Custom Clinical Styling
+    # Inject Custom Clinical Styling & Theme Detection
     gr.HTML(CUSTOM_CSS)
 
     # 1. Main Header & Telemetry Bar
-    gr.HTML("""
-    <div style="text-align:left; margin-bottom: 12px;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:8px;">
-            <div>
-                <h1 style="margin:0; font-size:26px; color:#0f172a; font-weight:800; letter-spacing:-0.5px;">
+    with gr.Row():
+        with gr.Column(scale=9):
+            gr.HTML("""
+            <div style="text-align:left;">
+                <h1 class="header-title" style="margin:0; font-size:26px; font-weight:800; letter-spacing:-0.5px;">
                     👁️ RetinaGuard AI: Clinical Decision Support & Governance System
                 </h1>
-                <p style="margin:4px 0 0 0; color:#475569; font-size:14px;">
+                <p class="header-subtitle" style="margin:4px 0 0 0; font-size:14px;">
                     Multi-Stage Diabetic Retinopathy Diagnostic Pipeline • BSc (Hons) Computer Science Coursework
                 </p>
             </div>
-            <div>
+            """)
+        with gr.Column(scale=3, min_width=220):
+            theme_toggle_btn = gr.Button("🌓 Toggle Dark / Light", size="sm", elem_classes=["theme-toggle-btn"])
+            gr.HTML("""
+            <div style="text-align:right; margin-top:4px;">
                 <span style="background:#e0f2fe; color:#0369a1; padding:4px 10px; border-radius:6px; font-weight:700; font-size:12px;">
                     EfficientNetB3 • Grad-CAM • U-Net • CBR
                 </span>
             </div>
-        </div>
-    </div>
+            """)
 
+    gr.HTML("""
     <div class="telemetry-bar">
         <div style="display:flex; align-items:center; gap:8px;">
             <div class="pulse-dot"></div>
@@ -867,6 +1054,14 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
         ],
     )
 
+    # Theme Toggle Event Handler (Client-Side JavaScript)
+    theme_toggle_btn.click(
+        fn=None,
+        inputs=None,
+        outputs=None,
+        js=THEME_TOGGLE_JS,
+    )
+
 
 if __name__ == "__main__":
-    demo.launch(theme=theme, share=True)
+    demo.launch(head=HEAD_SCRIPT, theme=theme, share=True)
