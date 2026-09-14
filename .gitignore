@@ -30,3 +30,5 @@ coursework_report_draft.md
 *.pdf
 STUDENT_ACTION_CHECKLIST.md
 SCREENSHOT_AND_EVIDENCE_GUIDE.md
+
+.gradio/

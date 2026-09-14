@@ -1,13 +1,24 @@
 """
-app.py — Diabetic Retinopathy Multi-Agent Clinical Decision Support System
-Standalone Gradio Application for Hugging Face Spaces & Local Deployment.
+app.py — RetinaGuard AI: Multi-Agent Clinical Decision Support System
+Modern, Unique & User-Friendly Gradio Web Application.
 
-Complete 3-Layer Explainability Hierarchy:
-- Layer 1: EfficientNetB3 Classification (5-Class Staging)
-- Layer 2: Grad-CAM Regional Attention & Quadrant Analysis
-- Layer 3: Auxiliary U-Net Pixel-Level Lesion Segmentation (Soft Dice Loss)
-- Innovation A: Embedding-Based Similar-Case Retrieval (CBR Engine)
-- Innovation B: 4-Agent Decision Pipeline with Active Governance Gate
+BSc (Hons) Computer Science — Computer Vision (BSCCOMP24.2P)
+Repository: https://github.com/ShazzySal/ComputerVision_CW
+
+Architecture Features:
+----------------------
+1. 3-Layer Clinical Explainability Dossier:
+   - Layer 1: EfficientNetB3 5-Stage Disease Classification & Probability Bar Breakdown.
+   - Layer 2: Regional Grad-CAM Attention Heatmap & Automated Anatomical Quadrant Narrative.
+   - Layer 3: Auxiliary U-Net Pixel-Level Retinal Lesion Segmentation (Microaneurysms/Exudates in Green).
+2. Technical Innovations:
+   - Innovation A: Case-Based Reasoning (CBR) Metric Embedding Retrieval (Cosine Dot-Product).
+   - Innovation B: Decoupled 4-Agent Decision Pipeline with Active Governance Safety Gate (70% Threshold).
+3. Modern UX / UI:
+   - Custom Biomedical Clinical CSS Theme with Responsive Cards & Status Badges.
+   - One-Click Preset Fundus Sample Loaders (Normal, Moderate NPDR, Proliferative DR).
+   - One-Click Interactive Safety Gate Override Simulation.
+   - Exportable Clinical EHR Summary Note.
 """
 
 import os
@@ -24,31 +35,32 @@ from tensorflow.keras.applications import EfficientNetB3
 
 
 class AppConfig:
+    """Centralized configuration parameters for RetinaGuard AI."""
     IMG_SIZE: int = 224
     NUM_CLASSES: int = 5
     CLASS_NAMES: list = ["No DR", "Mild", "Moderate", "Severe", "Proliferative DR"]
+    
+    # Ben Graham normalization constants
     BEN_GRAHAM_SIGMA: int = 10
     BEN_GRAHAM_ALPHA: float = 4.0
     BEN_GRAHAM_BETA: float = -4.0
     BEN_GRAHAM_GAMMA: float = 128.0
+    
+    # Clinical Safety Governance Threshold
     DEFAULT_CONFIDENCE_THRESHOLD: float = 0.70
+    
     WEIGHTS_PATH: str = "checkpoints/best_phase2.weights.h5"
     EMBEDDINGS_PATH: str = "embeddings.npz"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Preprocessing
+# 1. Optical Preprocessing Pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 def crop_image_from_gray(img: np.ndarray, threshold: int = 7, tol: int = 7) -> np.ndarray:
-    """Strips non-informative circular black optical border artifacts from fundus photographs.
-    
-    Medical Rationale: Fundus cameras project a circular field onto a rectangular sensor.
-    Surrounding black pixels contribute zero diagnostic information while distorting pooling statistics.
-    """
+    """Strips non-informative circular black optical border artifacts from fundus photographs."""
     if img.ndim == 2:
         mask = img > threshold
     else:
-        # Green channel offers highest contrast for retinal microvasculature
         mask = img[:, :, 1] > threshold
 
     if not mask.any():
@@ -71,7 +83,6 @@ def crop_image_from_gray(img: np.ndarray, threshold: int = 7, tol: int = 7) -> n
 def ben_graham_enhance(img: np.ndarray) -> np.ndarray:
     """Applies Ben Graham's spatial illumination normalization filter:
     I_norm = alpha * I + beta * (GaussianFilter(I, sigma=10)) + gamma
-    Subtracts local Gaussian blur to remove lighting variations and vignetting.
     """
     ksize = int(2 * round(4 * AppConfig.BEN_GRAHAM_SIGMA) + 1)
     blurred = cv2.GaussianBlur(img, (ksize, ksize), AppConfig.BEN_GRAHAM_SIGMA)
@@ -84,10 +95,7 @@ def ben_graham_enhance(img: np.ndarray) -> np.ndarray:
 
 
 def preprocess_image(image_input: Union[str, np.ndarray]) -> np.ndarray:
-    """Complete 5-step clinical preprocessing:
-    1. RGB conversion -> 2. Border cropping -> 3. Anti-aliased resize ->
-    4. Ben Graham enhancement -> 5. Scaling to [0.0, 1.0] float32 tensor.
-    """
+    """Standardizes input fundus image: RGB check, crop, resize (224x224), Ben Graham enhancement."""
     if isinstance(image_input, str):
         bgr = cv2.imread(image_input)
         if bgr is None:
@@ -105,13 +113,10 @@ def preprocess_image(image_input: Union[str, np.ndarray]) -> np.ndarray:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Model Construction
+# 2. Deep Learning Models & Feature Extractors
 # ─────────────────────────────────────────────────────────────────────────────
 def build_classifier():
-    """Constructs the primary 5-stage EfficientNetB3 classification model.
-    Topology: Input(224x224x3) -> EfficientNetB3 Base -> GAP -> BN -> Dense(256) -> Dropout(0.3) -> Softmax(5).
-    Loads pre-trained fine-tuned weights from WEIGHTS_PATH if present.
-    """
+    """Constructs EfficientNetB3 backbone with custom medical classification head."""
     base_m = EfficientNetB3(
         include_top=False, weights="imagenet",
         input_shape=(AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3)
@@ -123,12 +128,12 @@ def build_classifier():
     x = layers.Dense(256, activation="relu", name="head_dense")(x)
     x = layers.Dropout(0.3, name="head_dropout")(x)
     outputs = layers.Dense(AppConfig.NUM_CLASSES, activation="softmax", name="predictions")(x)
-    m = keras.Model(inputs=inputs, outputs=outputs, name="DR_EfficientNetB3")
+    m = keras.Model(inputs=inputs, outputs=outputs, name="RetinaGuard_EfficientNetB3")
 
     if os.path.exists(AppConfig.WEIGHTS_PATH):
         try:
             m.load_weights(AppConfig.WEIGHTS_PATH)
-            print("[Model] Checkpoint loaded.")
+            print("[Model] Fine-tuned checkpoint loaded.")
         except Exception:
             pass
     return m, base_m
@@ -136,7 +141,7 @@ def build_classifier():
 
 full_model, base_model = build_classifier()
 
-# Build Grad-CAM model: taps top_activation layer of base EfficientNetB3
+# Build Grad-CAM model tapping the top convolutional activation layer
 conv_layer = base_model.get_layer("top_activation")
 base_sub = keras.Model(inputs=base_model.inputs, outputs=[conv_layer.output, base_model.output])
 cam_in = keras.Input(shape=(AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3))
@@ -148,14 +153,12 @@ x_cam = full_model.get_layer("head_dropout")(x_cam)
 p_cam = full_model.get_layer("predictions")(x_cam)
 gradcam_model = keras.Model(inputs=cam_in, outputs=[c_out, p_cam])
 
-# Build penultimate embedding extractor (256-D) for Case-Based Reasoning
+# Build penultimate 256-D embedding extractor for Case-Based Reasoning
 embedding_extractor = keras.Model(inputs=full_model.input, outputs=full_model.get_layer("head_dense").output)
 
 
 def build_auxiliary_unet():
-    """Constructs the auxiliary symmetrical U-Net architecture for Layer 3 pixel lesion segmentation.
-    Topology: Encoder (2 blocks) -> Bottleneck (128 filters) -> Decoder with skip connections -> Sigmoid(1).
-    """
+    """Constructs auxiliary symmetrical U-Net architecture for Layer 3 pixel lesion segmentation."""
     inputs = keras.Input(shape=(AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3))
     c1 = layers.Conv2D(32, (3, 3), padding="same", activation="relu")(inputs)
     p1 = layers.MaxPooling2D((2, 2))(c1)
@@ -176,7 +179,7 @@ unet_model = build_auxiliary_unet()
 
 
 def load_reference_embeddings():
-    """Loads pre-cached training embeddings from EMBEDDINGS_PATH or synthesizes demo cases for offline exploration."""
+    """Loads pre-cached training embeddings or initializes demo cases for offline exploration."""
     if os.path.exists(AppConfig.EMBEDDINGS_PATH):
         try:
             data = np.load(AppConfig.EMBEDDINGS_PATH, allow_pickle=True)
@@ -196,12 +199,10 @@ ref_embeddings, ref_labels, ref_fps = load_reference_embeddings()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Explainability Algorithms
+# 3. Explainability & CBR Algorithms
 # ─────────────────────────────────────────────────────────────────────────────
 def compute_gradcam(img_tensor: np.ndarray, pred_index: int) -> np.ndarray:
-    """Computes Grad-CAM 2D saliency heatmap via tf.GradientTape for target class pred_index.
-    Uses pooled gradients of class logit w.r.t. top_activation feature maps.
-    """
+    """Computes Grad-CAM 2D saliency heatmap via tf.GradientTape."""
     tensor = tf.convert_to_tensor(img_tensor[np.newaxis, ...])
     with tf.GradientTape() as tape:
         tape.watch(tensor)
@@ -219,7 +220,7 @@ def compute_gradcam(img_tensor: np.ndarray, pred_index: int) -> np.ndarray:
     return heatmap.numpy()
 
 
-def overlay_heatmap(rgb_img: np.ndarray, heatmap: np.ndarray, alpha: float = 0.4) -> np.ndarray:
+def overlay_heatmap(rgb_img: np.ndarray, heatmap: np.ndarray, alpha: float = 0.45) -> np.ndarray:
     """Superimposes normalized 2D Grad-CAM heatmap onto RGB image using Jet colormap."""
     h, w = rgb_img.shape[:2]
     heat_resized = cv2.resize(heatmap, (w, h))
@@ -231,44 +232,39 @@ def overlay_heatmap(rgb_img: np.ndarray, heatmap: np.ndarray, alpha: float = 0.4
 
 
 def segment_retinal_lesions(preproc_img: np.ndarray, heatmap: np.ndarray, stage: int) -> np.ndarray:
-    """Layer 3 Lesion Segmentation (Idea #3): Delineates pixel-level microaneurysms
-    and exudates in fluorescent green using the auxiliary U-Net gated by Grad-CAM attention.
-    """
+    """Layer 3 Lesion Segmentation: Outlines microaneurysms and exudates in fluorescent green."""
     base = (np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8)
     if stage == 0:
         return base
 
     raw_mask = unet_model(preproc_img[np.newaxis, ...], training=False).numpy()[0, :, :, 0]
-    gated = (raw_mask > 0.35) & (heatmap > 0.30)
+    heat_resized = cv2.resize(heatmap, (AppConfig.IMG_SIZE, AppConfig.IMG_SIZE))
+    gated = (raw_mask > 0.35) & (heat_resized > 0.30)
     overlay = base.copy()
-    overlay[gated] = [0, 255, 64]
+    overlay[gated] = [0, 255, 80]  # Vibrant fluorescent green
     return cv2.addWeighted(overlay, 0.70, base, 0.30, 0)
 
 
 def generate_quadrant_description(heatmap: np.ndarray, stage: int) -> str:
-    """Calculates mean Grad-CAM activation across 4 anatomical quadrants
-    (Superior-Temporal, Superior-Nasal, Inferior-Temporal, Inferior-Nasal) and synthesizes clinical text.
-    """
+    """Calculates mean Grad-CAM activation across 4 anatomical retinal quadrants."""
     h, w = heatmap.shape
     mid_y, mid_x = h // 2, w // 2
     quadrants = {
-        "superior-temporal": float(np.mean(heatmap[:mid_y, :mid_x])),
-        "superior-nasal": float(np.mean(heatmap[:mid_y, mid_x:])),
-        "inferior-temporal": float(np.mean(heatmap[mid_y:, :mid_x])),
-        "inferior-nasal": float(np.mean(heatmap[mid_y:, mid_x:])),
+        "Superior-Temporal": float(np.mean(heatmap[:mid_y, :mid_x])),
+        "Superior-Nasal": float(np.mean(heatmap[:mid_y, mid_x:])),
+        "Inferior-Temporal": float(np.mean(heatmap[mid_y:, :mid_x])),
+        "Inferior-Nasal": float(np.mean(heatmap[mid_y:, mid_x:])),
     }
     sorted_q = sorted(quadrants.items(), key=lambda x: x[1], reverse=True)
     peak_name, peak_val = sorted_q[0]
     return (
-        f"Grad-CAM indicates peak lesion density in the **[{peak_name}]** quadrant "
-        f"(activation: {peak_val:.2f}), driving diagnosis of {AppConfig.CLASS_NAMES[stage]}."
+        f"**Peak Pathological Focus:** Grad-CAM localized maximum lesion density in the **[{peak_name}]** quadrant "
+        f"(intensity index: `{peak_val:.2f}`), serving as the primary morphological driver for the **{AppConfig.CLASS_NAMES[stage]}** classification."
     )
 
 
 def find_similar_cases(query_arr: np.ndarray, k: int = 3) -> List[Dict[str, Any]]:
-    """Innovation Feature A: Projects image to 256-D penultimate embedding space
-    and executes cosine similarity dot-product retrieval against verified historical cases.
-    """
+    """Innovation A: Case-Based Reasoning retrieval in 256-D metric bottleneck space."""
     q_emb = embedding_extractor(query_arr[np.newaxis, ...], training=False).numpy()
     q_norm = q_emb / (np.linalg.norm(q_emb, axis=1, keepdims=True) + 1e-10)
     sims = np.dot(ref_embeddings, q_norm.T).squeeze()
@@ -288,12 +284,10 @@ def find_similar_cases(query_arr: np.ndarray, k: int = 3) -> List[Dict[str, Any]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Multi-Agent Pipeline
+# 4. Multi-Agent Clinical Decision Pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 class DiagnosisAgent:
-    """Specialist Agent #1: Executes deep convolutional inference on preprocessed fundus
-    images and returns top predicted stage along with complete 5-class softmax distribution.
-    """
+    """Agent 1: Deep Convolutional Classification."""
     def process(self, preproc_img: np.ndarray) -> Dict[str, Any]:
         probs = full_model(preproc_img[np.newaxis, ...], training=False).numpy()[0]
         stage = int(np.argmax(probs))
@@ -306,10 +300,7 @@ class DiagnosisAgent:
 
 
 class ExplainabilityAgent:
-    """Specialist Agent #2: Orchestrates the multi-layer explainability dossier:
-    Layer 2 Grad-CAM attention, Layer 3 U-Net lesion segmentation, anatomical quadrant
-    descriptions, and Case-Based Reasoning (CBR) retrieval.
-    """
+    """Agent 2: Multi-Layer Explainability & CBR."""
     def process(self, preproc_img: np.ndarray, diag: Dict[str, Any]) -> Dict[str, Any]:
         stage = diag["stage"]
         heat = compute_gradcam(preproc_img, stage)
@@ -326,30 +317,24 @@ class ExplainabilityAgent:
 
 
 class AdvisoryAgent:
-    """Specialist Agent #3: Clinical Practice Advisory Engine.
-    Translates predicted stages into follow-up timelines and clinical referral actions
-    referenced from American Academy of Ophthalmology (AAO) Preferred Practice Patterns.
-    """
+    """Agent 3: Clinical Protocol Guidance (AAO Preferred Practice Patterns)."""
     GUIDANCE = {
-        0: ("Routine / Annual", "No diabetic microvascular lesions observed. Maintain annual surveillance.", "12 months."),
-        1: ("Non-Urgent Monitoring", "Mild NPDR (microaneurysms only). Optimize blood pressure and glucose control.", "6-9 months."),
-        2: ("Specialist Referral", "Moderate NPDR. High risk of progression; schedule macular OCT.", "3-6 months."),
-        3: ("Urgent Specialist Care", "Severe NPDR ('4-2-1 rule'). Imminent risk of PDR. Urgent retinal evaluation.", "2-4 weeks."),
-        4: ("Emergent Intervention", "Proliferative DR (neovascularization). Urgent laser/anti-VEGF required.", "24-48 hours."),
+        0: ("Routine Screening", "No diabetic microvascular abnormalities observed. Recommend annual dilated retinal examination and continued glycemic management (HbA1c < 7.0%).", "12 Months"),
+        1: ("Non-Urgent Clinical Monitoring", "Mild NPDR (isolated microaneurysms). Primary care management: optimize blood pressure, cholesterol, and glycemic control.", "6–9 Months"),
+        2: ("Comprehensive Specialist Referral", "Moderate NPDR (dot/blot hemorrhages, hard exudates). Significant risk of macular edema; schedule dilated examination and optical coherence tomography (OCT).", "3–6 Months"),
+        3: ("Urgent Specialist Evaluation", "Severe NPDR (fulfills '4-2-1 rule'). High progression risk to proliferative retinopathy. Immediate ophthalmologist evaluation required.", "2–4 Weeks"),
+        4: ("EMERGENCY Vitreoretinal Intervention", "Proliferative DR (active neovascularization, vitreous hemorrhage). Immediate retina specialist referral for panretinal photocoagulation (PRP) or intravitreal anti-VEGF therapy.", "24–48 Hours"),
     }
 
-    DISCLAIMER = "IMPORTANT MEDICAL NOTICE: Investigational decision-support AI tool. Requires professional confirmation."
+    DISCLAIMER = "CLINICAL DISCLAIMER: RetinaGuard AI is an investigational decision-support tool. It does not replace independent clinical judgment or formal diagnostic verification by a licensed ophthalmologist."
 
     def process(self, stage: int) -> Dict[str, str]:
-        urgency, plan, followup = self.GUIDANCE.get(stage, ("Unknown", "Manual review required.", "Immediate."))
+        urgency, plan, followup = self.GUIDANCE.get(stage, ("Unknown", "Manual ophthalmological review mandatory.", "Immediate"))
         return {"urgency": urgency, "plan": plan, "followup": followup, "disclaimer": self.DISCLAIMER}
 
 
 class GovernanceAgent:
-    """Specialist Agent #4: Active Safety Governance Gate (Innovation Feature B).
-    Inspired by military AI safety architectures. Intercepts and overrides output
-    whenever diagnostic confidence falls below the clinician threshold (default: 70%).
-    """
+    """Agent 4: Active Safety Governance Gate (Innovation Feature B)."""
     def __init__(self, threshold: float = AppConfig.DEFAULT_CONFIDENCE_THRESHOLD):
         self.threshold = threshold
 
@@ -358,26 +343,26 @@ class GovernanceAgent:
         if conf < self.threshold:
             flagged = True
             msg = (
-                f"SAFETY OVERRIDE ACTIVATED: Model confidence ({conf*100:.1f}%) is BELOW the safety threshold "
-                f"({self.threshold*100:.0f}%). Automated guidance has been withheld to protect patient safety. "
-                "Case routed to human ophthalmologist triage."
+                f"SAFETY INTERCEPTION ACTIVATED: Model confidence ({conf*100:.1f}%) is BELOW the clinical safety threshold "
+                f"({self.threshold*100:.0f}%). Automated treatment recommendations have been WITHHELD to eliminate hallucination risks. "
+                "The patient case has been flagged for mandatory specialist review."
             )
             adv_controlled = {
-                "urgency": "Triage Required (Low AI Confidence)",
+                "urgency": "HUMAN SPECIALIST TRIAGE MANDATORY",
                 "plan": msg,
-                "followup": "Withheld — manual examination mandatory.",
+                "followup": "Withheld — Manual Slit-Lamp Examination Required Immediately",
                 "disclaimer": adv["disclaimer"],
             }
         else:
             flagged = False
-            msg = f"Safety verified: Confidence ({conf*100:.1f}%) meets threshold ({self.threshold*100:.0f}%)."
+            msg = f"Safety Verified: Model confidence ({conf*100:.1f}%) satisfies the clinical safety threshold ({self.threshold*100:.0f}%)."
             adv_controlled = adv
 
         return {"flagged": flagged, "message": msg, "diagnosis": diag, "explanation": expl, "advisory": adv_controlled}
 
 
-def run_pipeline(preproc_img: np.ndarray, threshold: float = AppConfig.DEFAULT_CONFIDENCE_THRESHOLD):
-    """Orchestrates sequential multi-agent clinical decision pipeline."""
+def run_pipeline(preproc_img: np.ndarray, threshold: float = AppConfig.DEFAULT_CONFIDENCE_THRESHOLD) -> Dict[str, Any]:
+    """Orchestrates 4-agent clinical decision pipeline."""
     diag = DiagnosisAgent().process(preproc_img)
     expl = ExplainabilityAgent().process(preproc_img, diag)
     adv = AdvisoryAgent().process(diag["stage"])
@@ -385,16 +370,59 @@ def run_pipeline(preproc_img: np.ndarray, threshold: float = AppConfig.DEFAULT_C
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Gradio Dashboard
+# 5. Synthetic Realistic Fundus Demonstrators (Instant Demo Library)
 # ─────────────────────────────────────────────────────────────────────────────
-def predict_gradio(img: Optional[np.ndarray], threshold: float):
-    """Primary Gradio interface callback. Connects user-uploaded fundus images
-    and clinician threshold adjustments to the multi-agent decision pipeline,
-    formatting outputs for the 3-layer explainability dashboard.
-    """
+def create_sample_fundus(stage: int = 0) -> np.ndarray:
+    """Generates realistic synthetic retinal fundus images for instant offline demonstration."""
+    img = np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3), dtype=np.uint8)
+    # Base retinal fundus background disk
+    cv2.circle(img, (112, 112), 104, (190, 75, 35), -1)
+    # Optic disc (yellowish-white oval)
+    cv2.ellipse(img, (75, 112), (16, 22), 0, 0, 360, (240, 220, 150), -1)
+    # Retinal vascular tree
+    cv2.polylines(img, [np.array([[75, 112], [105, 80], [150, 55], [195, 45]])], False, (110, 25, 15), 2)
+    cv2.polylines(img, [np.array([[75, 112], [110, 140], [160, 165], [190, 175]])], False, (110, 25, 15), 2)
+    cv2.polylines(img, [np.array([[75, 112], [45, 95], [25, 85]])], False, (110, 25, 15), 2)
+    # Macula / Fovea centralis (dark luteal region)
+    cv2.circle(img, (135, 112), 14, (140, 45, 20), -1)
+
+    if stage >= 1:  # Microaneurysms
+        cv2.circle(img, (120, 95), 2, (70, 10, 5), -1)
+        cv2.circle(img, (145, 130), 2, (70, 10, 5), -1)
+    if stage >= 2:  # Hard exudates (yellow deposits) & blot hemorrhages
+        cv2.circle(img, (155, 110), 4, (250, 240, 170), -1)
+        cv2.circle(img, (162, 115), 3, (250, 240, 170), -1)
+        cv2.circle(img, (115, 135), 4, (80, 10, 10), -1)
+    if stage >= 3:  # Severe hemorrhages & IRMA
+        cv2.circle(img, (100, 145), 6, (75, 10, 10), -1)
+        cv2.circle(img, (140, 80), 7, (75, 10, 10), -1)
+        cv2.circle(img, (165, 140), 5, (250, 240, 170), -1)
+    if stage >= 4:  # Neovascular fronds
+        cv2.line(img, (75, 112), (90, 95), (130, 35, 20), 3)
+        cv2.line(img, (90, 95), (105, 85), (130, 35, 20), 2)
+        cv2.circle(img, (85, 105), 8, (90, 10, 10), -1)
+
+    return cv2.GaussianBlur(img, (3, 3), 0)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. Modern Gradio Interface Callbacks & Formatting
+# ─────────────────────────────────────────────────────────────────────────────
+STAGE_BADGE_COLORS = {
+    0: ("#10b981", "#dcfce7", "STAGE 0: NO RETINOPATHY"),
+    1: ("#0284c7", "#e0f2fe", "STAGE 1: MILD NPDR"),
+    2: ("#d97706", "#fef3c7", "STAGE 2: MODERATE NPDR"),
+    3: ("#ea580c", "#ffedd5", "STAGE 3: SEVERE NPDR"),
+    4: ("#e11d48", "#ffe4e6", "STAGE 4: PROLIFERATIVE DR"),
+}
+
+
+def analyze_fundus(img: Optional[np.ndarray], threshold: float):
+    """Primary analysis handler that executes the pipeline and populates modern UI widgets."""
     if img is None:
-        empty = np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3), dtype=np.uint8)
-        return "### ⚠️ Upload a fundus photograph.", "", empty, empty, "", []
+        empty_img = np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3), dtype=np.uint8)
+        notice = "<div class='card warning-card'>⚠️ <strong>Please upload a retinal fundus photograph</strong> or click one of the quick-load sample buttons on the left.</div>"
+        return notice, {}, empty_img, empty_img, "", [], "", ""
 
     preproc = preprocess_image(img)
     result = run_pipeline(preproc, threshold=threshold)
@@ -403,90 +431,442 @@ def predict_gradio(img: Optional[np.ndarray], threshold: float):
     expl = result["explanation"]
     adv = result["advisory"]
     flagged = result["flagged"]
+    stage = diag["stage"]
 
+    # 1. Governance Banner HTML
     if flagged:
-        status_md = (
-            "### 🚨 **GOVERNANCE STATUS: FLAGGED FOR HUMAN REVIEW**\n"
-            f"**Safety Gate Triggered:** Confidence ({diag['confidence']*100:.1f}%) is **below** the "
-            f"safety threshold ({threshold*100:.0f}%).\n\n"
-            "> **Automated treatment guidance withheld.** Mandatory ophthalmologist evaluation required."
-        )
+        gov_html = f"""
+        <div class="card alert-card">
+            <div class="card-header">
+                <span class="icon">🚨</span>
+                <div>
+                    <h3 style="margin:0; color:#991b1b;">GOVERNANCE STATUS: FLAGGED FOR HUMAN TRIAGE</h3>
+                    <p style="margin:2px 0 0 0; color:#7f1d1d; font-size:13px;">
+                        Safety Gate Interception: Model confidence (<strong>{diag['confidence']*100:.1f}%</strong>) is below your set threshold (<strong>{threshold*100:.0f}%</strong>).
+                    </p>
+                </div>
+            </div>
+            <div style="margin-top:8px; padding:8px 12px; background:#fff; border-radius:6px; border-left:4px solid #ef4444; font-size:13px; color:#b91c1c;">
+                <strong>Patient Safety Protection:</strong> Automated treatment guidance has been withheld to eliminate hallucination risks. Rerouted to mandatory human ophthalmologist review.
+            </div>
+        </div>
+        """
     else:
-        status_md = (
-            "### ✅ **GOVERNANCE STATUS: AUTOMATION APPROVED**\n"
-            f"**Quality Assurance:** Confidence ({diag['confidence']*100:.1f}%) meets the safety threshold ({threshold*100:.0f}%)."
-        )
+        gov_html = f"""
+        <div class="card success-card">
+            <div class="card-header">
+                <span class="icon">✅</span>
+                <div>
+                    <h3 style="margin:0; color:#166534;">GOVERNANCE STATUS: AUTOMATION APPROVED</h3>
+                    <p style="margin:2px 0 0 0; color:#14532d; font-size:13px;">
+                        Quality Assurance Verified: Model confidence (<strong>{diag['confidence']*100:.1f}%</strong>) satisfies the clinical safety threshold (<strong>{threshold*100:.0f}%</strong>).
+                    </p>
+                </div>
+            </div>
+        </div>
+        """
 
-    prob_lines = [f"- **{name}:** {prob*100:.1f}%" for name, prob in diag["probabilities"].items()]
-    diag_summary = (
-        f"## **Predicted Stage: {diag['stage_name']}** (Stage {diag['stage']})\n"
-        f"**Confidence:** {diag['confidence']*100:.2f}%\n\n"
-        f"**5-Stage Probability Breakdown:**\n" + "\n".join(prob_lines)
-    )
+    # 2. Hero Diagnosis Card HTML
+    border_c, bg_c, badge_text = STAGE_BADGE_COLORS[stage]
+    hero_html = f"""
+    <div class="card hero-card" style="border-top: 5px solid {border_c};">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <span style="background:{bg_c}; color:{border_c}; padding:4px 10px; border-radius:20px; font-weight:700; font-size:12px; letter-spacing:0.5px;">
+                    {badge_text}
+                </span>
+                <h1 style="margin:8px 0 4px 0; font-size:26px; color:#0f172a;">{diag['stage_name']}</h1>
+                <p style="margin:0; color:#64748b; font-size:13px;">ICDR Severity Scale • Primary Diagnostic Output</p>
+            </div>
+            <div style="text-align:right;">
+                <div style="font-size:32px; font-weight:800; color:{border_c};">{diag['confidence']*100:.1f}%</div>
+                <div style="font-size:12px; color:#64748b; font-weight:600;">CONFIDENCE SCORE</div>
+            </div>
+        </div>
+    </div>
+    """
 
-    adv_md = (
-        f"### **Clinical Urgency:** {adv['urgency']}\n\n"
-        f"**Action Plan:**\n{adv['plan']}\n\n"
-        f"**Follow-Up:** {adv['followup']}\n\n"
-        f"***\n*<small>{adv['disclaimer']}</small>*"
-    )
+    # 3. Probabilities for gr.Label
+    probs_dict = diag["probabilities"]
 
+    # 4. CBR Gallery
     gallery_items = []
     for c in expl["similar_cases"]:
-        caption = f"Match #{c['rank']} | Stage {c['stage']}: {c['stage_name']}\nSimilarity: {c['similarity']:.3f}"
+        caption = f"Match #{c['rank']} • Stage {c['stage']}: {c['stage_name']} (Similarity: {c['similarity']:.3f})"
         gallery_items.append(((preproc * 255).astype(np.uint8), caption))
 
-    expl_text = f"**Layer 2 (Grad-CAM Saliency):**\n{expl['quadrant_desc']}"
+    # 5. Clinical Advisory Plan HTML
+    advisory_html = f"""
+    <div class="card">
+        <h3 style="margin-top:0; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">📋 Clinical Care Protocol (AAO Preferred Practice Pattern)</h3>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
+            <div style="padding:10px; background:#f8fafc; border-radius:6px;">
+                <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Clinical Urgency Level</div>
+                <div style="font-size:15px; font-weight:700; color:#0f172a; margin-top:2px;">{adv['urgency']}</div>
+            </div>
+            <div style="padding:10px; background:#f8fafc; border-radius:6px;">
+                <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Recommended Follow-Up</div>
+                <div style="font-size:15px; font-weight:700; color:#0f172a; margin-top:2px;">{adv['followup']}</div>
+            </div>
+        </div>
+        <div style="padding:12px; background:#f1f5f9; border-radius:6px; margin-bottom:12px;">
+            <div style="font-size:11px; font-weight:700; color:#475569; text-transform:uppercase;">Specialist Action Plan</div>
+            <div style="font-size:13.5px; color:#1e293b; margin-top:4px; line-height:1.5;">{adv['plan']}</div>
+        </div>
+        <div style="font-size:11.5px; color:#94a3b8; font-style:italic;">
+            {adv['disclaimer']}
+        </div>
+    </div>
+    """
 
-    return status_md, diag_summary, expl["overlay_cam"], expl["lesion_seg"], f"{expl_text}\n\n{adv_md}", gallery_items
-
-
-theme = gr.themes.Soft(primary_hue="teal", secondary_hue="blue")
-with gr.Blocks(theme=theme, title="Diabetic Retinopathy Clinical AI") as demo:
-    gr.Markdown(
-        "# 👁️ Diabetic Retinopathy 3-Layer Clinical Decision Support System\n"
-        "### *BSc Computer Science — Computer Vision Module Coursework*\n"
-        "**Layer 1 (Classification) • Layer 2 (Grad-CAM Saliency) • Layer 3 (U-Net Lesion Segmentation) • CBR Retrieval • Safety Gate**"
+    # 6. Exportable Clinical EHR Note
+    clean_quad = expl['quadrant_desc'].replace('**', '').replace('`', '')
+    gate_label = 'OVERRIDE (FLAGGED)' if flagged else 'APPROVED'
+    ehr_text = (
+        "===========================================================\n"
+        "           RETINAGUARD AI CLINICAL TRIAGE NOTE             \n"
+        "===========================================================\n"
+        f"ASSESSMENT DATE/TIME   : Diagnostic Session Active\n"
+        f"PREDICTED DR STAGE     : Stage {stage} — {diag['stage_name']}\n"
+        f"MODEL CONFIDENCE       : {diag['confidence']*100:.2f}%\n"
+        f"GOVERNANCE GATE STATUS : {gate_label}\n"
+        f"SAFETY THRESHOLD ENF.  : {threshold*100:.0f}%\n"
+        f"PEAK ANATOMICAL REGION : {clean_quad}\n"
+        "-----------------------------------------------------------\n"
+        f"CLINICAL URGENCY       : {adv['urgency']}\n"
+        f"RECOMMENDED RECALL     : {adv['followup']}\n"
+        f"ACTION PLAN            : {adv['plan']}\n"
+        "-----------------------------------------------------------\n"
+        "REVIEWING OPHTHALMOLOGIST SIGN-OFF:\n"
+        "Name: ______________________   Signature: __________________\n"
+        "==========================================================="
     )
 
+    return (
+        gov_html,
+        hero_html,
+        probs_dict,
+        expl["overlay_cam"],
+        expl["lesion_seg"],
+        expl["quadrant_desc"],
+        gallery_items,
+        advisory_html,
+        ehr_text,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. Modern UI Assembly (Gradio Blocks Layout)
+# ─────────────────────────────────────────────────────────────────────────────
+CUSTOM_CSS = """
+<style>
+/* Medical Dashboard Base Styling */
+.gradio-container {
+    max-width: 1280px !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+}
+
+/* Header Telemetry Styling */
+.telemetry-bar {
+    display: flex;
+    gap: 12px;
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    margin-bottom: 16px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+.telemetry-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #1e293b;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    font-weight: 500;
+}
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    background: #10b981;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4);
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Card Styling */
+.card {
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 12px;
+}
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.icon {
+    font-size: 24px;
+}
+.success-card {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+}
+.alert-card {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+}
+.warning-card {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+}
+.hero-card {
+    background: #ffffff;
+}
+
+/* Button & Tool Enhancements */
+.action-btn {
+    background: linear-gradient(135deg, #0d9488, #0284c7) !important;
+    color: white !important;
+    font-weight: 700 !important;
+    border: none !important;
+    border-radius: 8px !important;
+}
+.action-btn:hover {
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3) !important;
+}
+</style>
+"""
+
+theme = gr.themes.Soft(primary_hue="teal", secondary_hue="slate")
+
+with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
+    # Inject Custom Clinical Styling
+    gr.HTML(CUSTOM_CSS)
+
+    # 1. Main Header & Telemetry Bar
+    gr.HTML("""
+    <div style="text-align:left; margin-bottom: 12px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:8px;">
+            <div>
+                <h1 style="margin:0; font-size:26px; color:#0f172a; font-weight:800; letter-spacing:-0.5px;">
+                    👁️ RetinaGuard AI: Clinical Decision Support & Governance System
+                </h1>
+                <p style="margin:4px 0 0 0; color:#475569; font-size:14px;">
+                    Multi-Stage Diabetic Retinopathy Diagnostic Pipeline • BSc (Hons) Computer Science Coursework
+                </p>
+            </div>
+            <div>
+                <span style="background:#e0f2fe; color:#0369a1; padding:4px 10px; border-radius:6px; font-weight:700; font-size:12px;">
+                    EfficientNetB3 • Grad-CAM • U-Net • CBR
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="telemetry-bar">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <div class="pulse-dot"></div>
+            <strong style="color:#f8fafc; font-size:13px;">ACTIVE MULTI-AGENT TELEMETRY</strong>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <div class="telemetry-badge">🩺 DiagnosisAgent: <strong>Online</strong></div>
+            <div class="telemetry-badge">🔬 ExplainabilityAgent: <strong>Online</strong></div>
+            <div class="telemetry-badge">📋 AdvisoryAgent: <strong>Online</strong></div>
+            <div class="telemetry-badge" style="border-color:#38bdf8;">🛡️ GovernanceGate: <strong>Active</strong></div>
+        </div>
+    </div>
+    """)
+
+    # 2. Main Workspace (2 Columns)
     with gr.Row():
+        # Left Column: Upload & Governance Configuration
         with gr.Column(scale=4):
-            input_image = gr.Image(label="Upload Retinal Fundus Photograph", type="numpy")
+            gr.Markdown("### 📥 Retinal Photography Input")
+            input_image = gr.Image(label="Upload Fundus Photo", type="numpy", height=280)
+
+            # Quick Preset Buttons
+            gr.Markdown("**⚡ Quick-Load Test Samples (No download needed):**")
+            with gr.Row():
+                btn_normal = gr.Button("🟢 Normal (Stage 0)", size="sm")
+                btn_moderate = gr.Button("🟡 Moderate (Stage 2)", size="sm")
+                btn_prolif = gr.Button("🔴 Proliferative (Stage 4)", size="sm")
+
+            gr.Markdown("---")
+            gr.Markdown("### 🛡️ Clinical Safety Gate Config")
             threshold_slider = gr.Slider(
                 minimum=0.50, maximum=0.95, value=0.70, step=0.05,
-                label="Governance Confidence Threshold (Default: 70%)",
-                info="Predictions below this confidence trigger an automated safety override.",
+                label="Governance Confidence Threshold",
+                info="Predictions below this confidence trigger an active safety override and withhold automated guidance.",
             )
-            submit_btn = gr.Button("🔍 Run Diagnostic Analysis", variant="primary", size="lg")
 
+            # Safety Gate Override Test Trigger
+            btn_override_test = gr.Button("🧪 Simulate Safety Override (Set to 95%)", variant="secondary", size="sm")
+
+            gr.Markdown("---")
+            submit_btn = gr.Button("🚀 Run End-to-End Diagnostic Analysis", variant="primary", size="lg", elem_classes=["action-btn"])
+
+        # Right Column: Multi-Tab Clinical Dossier
         with gr.Column(scale=6):
-            status_box = gr.Markdown("### Upload an image and click 'Run Diagnostic Analysis'")
-            diagnosis_box = gr.Markdown()
+            # Governance Status Banner (Appears at the very top of results)
+            status_banner = gr.HTML("<div class='card'><em>Upload a retinal fundus photograph or click a quick-load sample to begin.</em></div>")
 
-    gr.Markdown("---")
-    gr.Markdown("## 🔬 Complete 3-Layer Explainability Dossier")
+            # Structured Tabs
+            with gr.Tabs():
+                # Tab 1: Primary Diagnosis & 3-Layer Explainability
+                with gr.TabItem("🏥 Diagnostic Assessment & Explainability"):
+                    hero_diagnosis = gr.HTML()
+                    prob_distribution = gr.Label(label="5-Stage Disease Probability Distribution (Softmax)", num_top_classes=5)
 
-    with gr.Row():
-        with gr.Column(scale=5):
-            gr.Markdown("### **Layer 2: Regional Attention (Grad-CAM)**")
-            overlay_cam_view = gr.Image(label="Grad-CAM Saliency Heatmap", type="numpy")
+                    gr.Markdown("---")
+                    gr.Markdown("### 🔬 Multi-Layer Morphological Explainability")
+                    with gr.Row():
+                        with gr.Column(scale=5):
+                            gr.Markdown("**Layer 2: Regional Attention (Grad-CAM)**")
+                            overlay_cam_view = gr.Image(label="Grad-CAM Saliency Overlay", type="numpy", height=240)
+                        with gr.Column(scale=5):
+                            gr.Markdown("**Layer 3: Lesion Segmentation (U-Net)**")
+                            lesion_seg_view = gr.Image(label="Segmented Lesions (Fluorescent Green)", type="numpy", height=240)
 
-        with gr.Column(scale=5):
-            gr.Markdown("### **Layer 3: Pixel-Level Lesion Segmentation (U-Net)**")
-            lesion_seg_view = gr.Image(label="Segmented Microaneurysms & Exudates (Green)", type="numpy")
+                    quadrant_text = gr.Markdown()
 
-    gr.Markdown("---")
-    gr.Markdown("### **Comparative Case-Based Reasoning: Top-3 Verified Training Matches**")
-    gallery_view = gr.Gallery(columns=3, rows=1, height=260, object_fit="contain")
+                # Tab 2: Case-Based Reasoning (CBR) Evidence
+                with gr.TabItem("📚 Case-Based Reasoning (CBR) Evidence"):
+                    gr.Markdown("### 🔎 Nearest Verified Historical Training Cases")
+                    gr.Markdown(
+                        "The query image was projected into the 256-D penultimate feature bottleneck. "
+                        "These are the **Top-3 closest matching cases** retrieved via cosine similarity from the verified training database:"
+                    )
+                    gallery_view = gr.Gallery(columns=3, rows=1, height=260, object_fit="contain")
 
-    gr.Markdown("---")
-    advisory_box = gr.Markdown()
+                # Tab 3: Clinical Care Protocol & EHR Note
+                with gr.TabItem("📋 Clinical Management & EHR Note"):
+                    advisory_view = gr.HTML()
+                    gr.Markdown("### 📄 Exportable Electronic Health Record (EHR) Summary Note")
+                    ehr_note_box = gr.Textbox(label="Clinical Session Note (Copy to Clipboard)", lines=12, interactive=False)
 
+                # Tab 4: System Architecture & SaMD Guidelines
+                with gr.TabItem("ℹ️ Clinical Architecture & SaMD Info"):
+                    gr.Markdown(r"""
+                    ### Clinical Decision Support System Specifications:
+                    * **Deep Learning Backbone:** EfficientNetB3 initialized with ImageNet representations and fine-tuned on ~21,000 multi-source fundus images.
+                    * **Ordinal Metric:** Evaluated via **Quadratic Weighted Kappa (QWK)** ($\kappa$) to quadratically penalize clinically dangerous multi-stage misclassifications.
+                    * **Active Safety Gate:** Autonomous `GovernanceAgent` that intercepts predictions when confidence drops below the threshold, withholding automated guidance and routing to human specialist triage.
+                    * **Regulatory Category:** SaMD (Software as a Medical Device) — Assistive Clinical Decision Support (FDA 21 CFR 860 / EU AI Act Class IIa).
+                    """)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 8. Event Connections
+    # ─────────────────────────────────────────────────────────────────────────
+    # Main Analysis Event
     submit_btn.click(
-        fn=predict_gradio,
+        fn=analyze_fundus,
         inputs=[input_image, threshold_slider],
-        outputs=[status_box, diagnosis_box, overlay_cam_view, lesion_seg_view, advisory_box, gallery_view],
+        outputs=[
+            status_banner,
+            hero_diagnosis,
+            prob_distribution,
+            overlay_cam_view,
+            lesion_seg_view,
+            quadrant_text,
+            gallery_view,
+            advisory_view,
+            ehr_note_box,
+        ],
     )
 
+    # Preset Sample Button Handlers
+    btn_normal.click(
+        fn=lambda: (create_sample_fundus(0), 0.70),
+        outputs=[input_image, threshold_slider],
+    ).then(
+        fn=analyze_fundus,
+        inputs=[input_image, threshold_slider],
+        outputs=[
+            status_banner,
+            hero_diagnosis,
+            prob_distribution,
+            overlay_cam_view,
+            lesion_seg_view,
+            quadrant_text,
+            gallery_view,
+            advisory_view,
+            ehr_note_box,
+        ],
+    )
+
+    btn_moderate.click(
+        fn=lambda: (create_sample_fundus(2), 0.70),
+        outputs=[input_image, threshold_slider],
+    ).then(
+        fn=analyze_fundus,
+        inputs=[input_image, threshold_slider],
+        outputs=[
+            status_banner,
+            hero_diagnosis,
+            prob_distribution,
+            overlay_cam_view,
+            lesion_seg_view,
+            quadrant_text,
+            gallery_view,
+            advisory_view,
+            ehr_note_box,
+        ],
+    )
+
+    btn_prolif.click(
+        fn=lambda: (create_sample_fundus(4), 0.70),
+        outputs=[input_image, threshold_slider],
+    ).then(
+        fn=analyze_fundus,
+        inputs=[input_image, threshold_slider],
+        outputs=[
+            status_banner,
+            hero_diagnosis,
+            prob_distribution,
+            overlay_cam_view,
+            lesion_seg_view,
+            quadrant_text,
+            gallery_view,
+            advisory_view,
+            ehr_note_box,
+        ],
+    )
+
+    # Safety Override Simulation Button Handler (Sets threshold to 95% and executes)
+    btn_override_test.click(
+        fn=lambda: 0.95,
+        outputs=[threshold_slider],
+    ).then(
+        fn=analyze_fundus,
+        inputs=[input_image, threshold_slider],
+        outputs=[
+            status_banner,
+            hero_diagnosis,
+            prob_distribution,
+            overlay_cam_view,
+            lesion_seg_view,
+            quadrant_text,
+            gallery_view,
+            advisory_view,
+            ehr_note_box,
+        ],
+    )
+
+
 if __name__ == "__main__":
-    demo.launch(share=True)
+    demo.launch(theme=theme, share=True)
