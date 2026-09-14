@@ -1,0 +1,24 @@
+# Python / Environment
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# Kaggle / Secrets
+kaggle.json
+*.zip
+
+# Datasets / Large Artifacts
+dr_data/
+content/
+*.tar.gz
+
+# OS
+Thumbs.db
+.DS_Store
