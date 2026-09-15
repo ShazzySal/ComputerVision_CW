@@ -1281,8 +1281,6 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                             chatbot_widget = gr.Chatbot(
                                 label="Clinical Knowledge Assistant",
                                 height=420,
-                                bubble_full_width=False,
-                                show_copy_button=True,
                             )
                             with gr.Row():
                                 chat_input = gr.Textbox(

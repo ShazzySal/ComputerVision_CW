@@ -1,0 +1,4 @@
+experiment_id,phase,learning_rate,epochs_trained,loss,accuracy,val_loss,val_accuracy,qwk_kappa,leakage_defense
+EXP-01_FrozenBase,Phase 1 (Frozen Base),0.001,15,0.3842,0.836,0.4102,0.824,0.7812,StratifiedGroupKFold (Patient-Grouped)
+EXP-02_FineTuning,Phase 2 (Top-30 Fine-Tuning),1e-05,25,0.2215,0.8812,0.2541,0.8765,0.848,StratifiedGroupKFold (Patient-Grouped)
+EXP-03_FinalEvaluated,Held-Out Test Set,N/A,N/A,0.2318,0.8741,N/A,N/A,0.8421,Zero Shared Patients Across Splits
