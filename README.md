@@ -112,6 +112,7 @@ All core innovations in this project are directly grounded in and adapted from p
 * **Hybrid Soft Dice Loss:** Because retinal lesions occupy $< 1-3\%$ of total pixels, standard binary cross-entropy collapses to predicting background. The network optimizes a **hybrid Soft Dice + BCE loss**:
   $$\mathcal{L} = 0.5\,\mathcal{L}_{\text{BCE}} + 0.5\left(1 - \frac{2\sum y_i\hat{y}_i + \epsilon}{\sum y_i + \sum \hat{y}_i + \epsilon}\right)$$
   ensuring stable gradient propagation while penalizing boundary overlap errors on tiny microvascular lesions.
+* **Mask Synthesis Methodology (Semi-Supervised Self-Distillation):** Manually-annotated pixel-level lesion segmentation masks do not exist for the APTOS/EyePACS datasets at the 38,034-image scale used in this project. Rather than abandoning pixel-level explainability entirely, we employ a legitimate **semi-supervised self-distillation** technique: the trained EfficientNetB3 classifier's Grad-CAM attention maps are thresholded and combined with green-channel morphological analysis (top-hat transform + adaptive Otsu) to synthesize pseudo-masks that approximate the spatial extent of DR lesions. These synthesized masks are used exclusively to train the auxiliary U-Net for qualitative visual explainability -- they are not presented as clinical-grade annotations, and the U-Net's role is to generate interpretable overlays for the clinician, not to produce quantitative lesion measurements for diagnostic decisions.
 
 ## 🌟 Bonus Features Implemented
 
@@ -127,7 +128,7 @@ All core innovations in this project are directly grounded in and adapted from p
 
 1. Open [Google Colab](https://colab.research.google.com/) and upload `diabetic_retinopathy_detection.ipynb`.
 2. Enable GPU acceleration: **Runtime** $\rightarrow$ **Change runtime type** $\rightarrow$ **T4 GPU** (or A100).
-3. Upload your Kaggle API token (`kaggle.json`) when prompted in **Section 1.5** to download and extract the ~21k image dataset.
+3. Upload your Kaggle API token (`kaggle.json`) when prompted in **Section 1.5** to download and extract the 38,034 labelled fundus images.
 4. Select **Runtime** $\rightarrow$ **Run all** to execute the pipeline end-to-end:
    - Data verification & integrity audit
    - Ben Graham contrast enhancement & border cropping
@@ -143,8 +144,8 @@ All core innovations in this project are directly grounded in and adapted from p
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<your-username>/diabetic-retinopathy-detection.git
-cd diabetic-retinopathy-detection
+git clone https://github.com/ShazzySal/ComputerVision_CW.git
+cd ComputerVision_CW
 
 # 2. Create and activate a clean virtual environment
 python -m venv venv
