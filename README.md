@@ -1,3 +1,16 @@
+---
+title: RetinaGuard AI - Diabetic Retinopathy Clinical Decision Support
+emoji: 👁️
+colorFrom: teal
+colorTo: blue
+sdk: gradio
+sdk_version: "4.20"
+app_file: app.py
+pinned: false
+license: other
+short_description: Multi-agent DR staging with EfficientNetB3, Grad-CAM, U-Net & CBR
+---
+
 # Diabetic Retinopathy Stage Detection: Multi-Agent Clinical Decision Support System
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)

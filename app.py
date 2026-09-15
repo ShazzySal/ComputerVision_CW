@@ -231,21 +231,27 @@ def overlay_heatmap(rgb_img: np.ndarray, heatmap: np.ndarray, alpha: float = 0.4
     return cv2.addWeighted(heat_color, alpha, base, 1.0 - alpha, 0)
 
 
-def segment_retinal_lesions(preproc_img: np.ndarray, heatmap: np.ndarray, stage: int) -> np.ndarray:
-    """Layer 3 Lesion Segmentation: Outlines microaneurysms and exudates in fluorescent green."""
+def segment_retinal_lesions(preproc_img: np.ndarray, heatmap: np.ndarray, stage: int) -> Tuple[np.ndarray, float]:
+    """Layer 3 Lesion Segmentation: Outlines microaneurysms and exudates in fluorescent green and calculates lesion area burden %."""
     base = (np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8)
     if stage == 0:
-        return base
+        return base, 0.0
 
     raw_mask = unet_model(preproc_img[np.newaxis, ...], training=False).numpy()[0, :, :, 0]
     heat_resized = cv2.resize(heatmap, (AppConfig.IMG_SIZE, AppConfig.IMG_SIZE))
     gated = (raw_mask > 0.35) & (heat_resized > 0.30)
+    
+    # Calculate quantitative lesion area percentage over visible parenchyma
+    visible_pixels = np.sum(np.mean(base, axis=2) > 10)
+    lesion_pixels = np.sum(gated)
+    lesion_ratio = float((lesion_pixels / max(visible_pixels, 1)) * 100.0)
+
     overlay = base.copy()
     overlay[gated] = [0, 255, 80]  # Vibrant fluorescent green
-    return cv2.addWeighted(overlay, 0.70, base, 0.30, 0)
+    return cv2.addWeighted(overlay, 0.70, base, 0.30, 0), lesion_ratio
 
 
-def generate_quadrant_description(heatmap: np.ndarray, stage: int) -> str:
+def generate_quadrant_description(heatmap: np.ndarray, stage: int) -> Tuple[str, Dict[str, float], str, float]:
     """Calculates mean Grad-CAM activation across 4 anatomical retinal quadrants."""
     h, w = heatmap.shape
     mid_y, mid_x = h // 2, w // 2
@@ -257,10 +263,11 @@ def generate_quadrant_description(heatmap: np.ndarray, stage: int) -> str:
     }
     sorted_q = sorted(quadrants.items(), key=lambda x: x[1], reverse=True)
     peak_name, peak_val = sorted_q[0]
-    return (
+    desc = (
         f"**Peak Pathological Focus:** Grad-CAM localized maximum lesion density in the **[{peak_name}]** quadrant "
         f"(intensity index: `{peak_val:.2f}`), serving as the primary morphological driver for the **{AppConfig.CLASS_NAMES[stage]}** classification."
     )
+    return desc, quadrants, peak_name, peak_val
 
 
 def find_similar_cases(query_arr: np.ndarray, k: int = 3) -> List[Dict[str, Any]]:
@@ -305,13 +312,17 @@ class ExplainabilityAgent:
         stage = diag["stage"]
         heat = compute_gradcam(preproc_img, stage)
         overlay_cam = overlay_heatmap(preproc_img, heat)
-        lesion_seg = segment_retinal_lesions(preproc_img, heat, stage)
-        quad_desc = generate_quadrant_description(heat, stage)
+        lesion_seg, lesion_pct = segment_retinal_lesions(preproc_img, heat, stage)
+        quad_desc, quad_scores, peak_quad, peak_val = generate_quadrant_description(heat, stage)
         sim_cases = find_similar_cases(preproc_img, k=3)
         return {
             "overlay_cam": overlay_cam,
             "lesion_seg": lesion_seg,
+            "lesion_pct": lesion_pct,
             "quadrant_desc": quad_desc,
+            "quadrant_scores": quad_scores,
+            "peak_quadrant": peak_quad,
+            "peak_val": peak_val,
             "similar_cases": sim_cases,
         }
 
@@ -638,7 +649,7 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float):
     if img is None:
         empty_img = np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3), dtype=np.uint8)
         notice = "<div class='card warning-card'>⚠️ <strong>Please upload a retinal fundus photograph</strong> or click one of the quick-load sample buttons on the left.</div>"
-        return notice, "", {}, empty_img, empty_img, "", [], "", ""
+        return notice, "", {}, empty_img, empty_img, "", [], "", "", "", "", ""
 
     preproc = preprocess_image(img)
     result = run_pipeline(preproc, threshold=threshold)
@@ -758,6 +769,84 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float):
         "==========================================================="
     )
 
+    # 7. Lesion Burden HTML metric card
+    lesion_pct = expl.get("lesion_pct", 0.0)
+    if lesion_pct == 0.0:
+        burden_color, burden_label = "#10b981", "Minimal / No Detectable Lesion Area"
+    elif lesion_pct < 5.0:
+        burden_color, burden_label = "#d97706", "Low-Moderate Burden"
+    elif lesion_pct < 15.0:
+        burden_color, burden_label = "#ea580c", "Moderate-High Burden"
+    else:
+        burden_color, burden_label = "#e11d48", "High Lesion Burden - Urgent Review"
+
+    lesion_burden_html = (
+        f'<div style="margin-top:8px; padding:10px 14px; background:#f8fafc; border-radius:8px; border-left:4px solid {burden_color};">'
+        f'<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#64748b; margin-bottom:4px;">Retinal Lesion Area Burden (U-Net Segmentation)</div>'
+        f'<div style="display:flex; align-items:baseline; gap:10px;">'
+        f'<span style="font-size:28px; font-weight:800; color:{burden_color};">{lesion_pct:.2f}%</span>'
+        f'<span style="font-size:13px; color:#475569;">of visible parenchyma</span></div>'
+        f'<div style="font-size:12px; color:{burden_color}; font-weight:600; margin-top:2px;">{burden_label}</div>'
+        f'</div>'
+    )
+
+    # 8. Anatomical Quadrant Salience HTML bar chart
+    quad_scores = expl.get("quadrant_scores", {})
+    peak_quad = expl.get("peak_quadrant", "-")
+    quad_bar_rows = ""
+    for qname, qval in sorted(quad_scores.items(), key=lambda x: x[1], reverse=True):
+        pct_width = min(int(qval * 100 * 3.5), 100)
+        is_peak = qname == peak_quad
+        bar_color = "#ef4444" if is_peak else "#60a5fa"
+        peak_marker = " [PEAK]" if is_peak else ""
+        fw = "700" if is_peak else "500"
+        fc = "#991b1b" if is_peak else "#334155"
+        quad_bar_rows += (
+            f'<div style="margin-bottom:6px;">'
+            f'<div style="display:flex; justify-content:space-between; font-size:12px; font-weight:{fw}; color:{fc}; margin-bottom:2px;">'
+            f'<span>{qname}{peak_marker}</span><span>{qval:.3f}</span></div>'
+            f'<div style="background:#e2e8f0; border-radius:4px; height:10px; overflow:hidden;">'
+            f'<div style="background:{bar_color}; width:{pct_width}%; height:100%; border-radius:4px;"></div></div></div>'
+        )
+
+    quadrant_chart_html = (
+        f'<div style="margin-top:10px; padding:12px 14px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">'
+        f'<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#64748b; margin-bottom:10px;">'
+        f'Anatomical Quadrant Grad-CAM Activation Index</div>'
+        f'{quad_bar_rows}'
+        f'<div style="font-size:11px; color:#94a3b8; margin-top:6px; font-style:italic;">'
+        f'Mean Grad-CAM saliency per quadrant (Superior/Inferior x Temporal/Nasal).</div>'
+        f'</div>'
+    )
+
+    # 9. Adjacent-Stage Confidence Margin
+    sorted_probs = sorted(diag["probabilities"].items(), key=lambda x: x[1], reverse=True)
+    top_stage_name, top_conf = sorted_probs[0]
+    sec_stage_name, sec_conf = sorted_probs[1] if len(sorted_probs) > 1 else ("-", 0.0)
+    margin = top_conf - sec_conf
+    margin_color = "#10b981" if margin > 0.40 else ("#d97706" if margin > 0.20 else "#e11d48")
+    margin_label = "High Certainty" if margin > 0.40 else ("Borderline - Monitor" if margin > 0.20 else "Low Certainty - Human Review Advised")
+
+    confidence_margin_html = (
+        f'<div style="margin-top:8px; padding:10px 14px; background:#f8fafc; border-radius:8px; border-left:4px solid {margin_color};">'
+        f'<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#64748b; margin-bottom:6px;">'
+        f'Diagnostic Uncertainty Margin (Adjacent-Stage Analysis)</div>'
+        f'<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; text-align:center;">'
+        f'<div style="background:#fff; border-radius:6px; padding:8px; border:1px solid #e2e8f0;">'
+        f'<div style="font-size:10px; color:#64748b; font-weight:600;">PRIMARY</div>'
+        f'<div style="font-size:13px; font-weight:700; color:#1e293b;">{top_stage_name}</div>'
+        f'<div style="font-size:16px; font-weight:800; color:{border_c};">{top_conf*100:.1f}%</div></div>'
+        f'<div style="background:#fff; border-radius:6px; padding:8px; border:1px solid #e2e8f0;">'
+        f'<div style="font-size:10px; color:#64748b; font-weight:600;">RUNNER-UP</div>'
+        f'<div style="font-size:13px; font-weight:700; color:#1e293b;">{sec_stage_name}</div>'
+        f'<div style="font-size:16px; font-weight:800; color:#64748b;">{sec_conf*100:.1f}%</div></div>'
+        f'<div style="background:#fff; border-radius:6px; padding:8px; border:1px solid #e2e8f0;">'
+        f'<div style="font-size:10px; color:#64748b; font-weight:600;">MARGIN</div>'
+        f'<div style="font-size:16px; font-weight:800; color:{margin_color};">{margin*100:.1f}%</div>'
+        f'<div style="font-size:10px; color:{margin_color}; font-weight:600;">{margin_label}</div></div>'
+        f'</div></div>'
+    )
+
     return (
         gov_html,
         hero_html,
@@ -768,6 +857,9 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float):
         gallery_items,
         advisory_html,
         ehr_text,
+        lesion_burden_html,
+        quadrant_chart_html,
+        confidence_margin_html,
     )
 
 
@@ -1121,6 +1213,15 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
             btn_override_test = gr.Button("🧪 Simulate Safety Override (Set to 95%)", variant="secondary", size="sm")
 
             gr.Markdown("---")
+            gr.Markdown("### Patient Intake Panel *(Optional Context)*")
+            patient_age = gr.Slider(minimum=18, maximum=90, value=55, step=1, label="Patient Age (years)")
+            diabetes_type = gr.Dropdown(
+                choices=["Type 1", "Type 2", "Gestational", "Not Specified"],
+                value="Type 2", label="Diabetes Type"
+            )
+            hba1c_level = gr.Slider(minimum=5.0, maximum=14.0, value=7.5, step=0.1, label="HbA1c (%)")
+            diabetes_duration = gr.Slider(minimum=0, maximum=40, value=10, step=1, label="Duration of Diabetes (years)")
+            gr.Markdown("---")
             submit_btn = gr.Button("🚀 Run End-to-End Diagnostic Analysis", variant="primary", size="lg", elem_classes=["action-btn"])
 
         # Right Column: Multi-Tab Clinical Dossier
@@ -1145,7 +1246,10 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                             gr.Markdown("**Layer 3: Lesion Segmentation (U-Net)**")
                             lesion_seg_view = gr.Image(label="Segmented Lesions (Fluorescent Green)", type="numpy", height=240)
 
+                    lesion_burden_view = gr.HTML()
                     quadrant_text = gr.Markdown()
+                    quadrant_chart_view = gr.HTML()
+                    confidence_margin_view = gr.HTML()
 
                 # Tab 2: Case-Based Reasoning (CBR) Evidence
                 with gr.TabItem("📚 Case-Based Reasoning (CBR) Evidence"):
@@ -1189,6 +1293,13 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                                 )
                                 chat_send_btn = gr.Button("Send", variant="primary", scale=1)
                             chat_clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
+                            gr.Markdown("**Quick Prompts:**")
+                            with gr.Row():
+                                chip_classify = gr.Button("Explain why this was classified", size="sm", variant="secondary")
+                                chip_rule421 = gr.Button("What is the 4-2-1 rule?", size="sm", variant="secondary")
+                            with gr.Row():
+                                chip_gradcam = gr.Button("How does Grad-CAM work?", size="sm", variant="secondary")
+                                chip_refer = gr.Button("When should I refer urgently?", size="sm", variant="secondary")
                         with gr.Column(scale=2):
                             gr.Markdown(r"""
                             ### ⚙️ System Specifications:
@@ -1216,6 +1327,9 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
             gallery_view,
             advisory_view,
             ehr_note_box,
+            lesion_burden_view,
+            quadrant_chart_view,
+            confidence_margin_view,
         ],
     )
 
@@ -1236,6 +1350,9 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
             gallery_view,
             advisory_view,
             ehr_note_box,
+            lesion_burden_view,
+            quadrant_chart_view,
+            confidence_margin_view,
         ],
     )
 
@@ -1255,6 +1372,9 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
             gallery_view,
             advisory_view,
             ehr_note_box,
+            lesion_burden_view,
+            quadrant_chart_view,
+            confidence_margin_view,
         ],
     )
 
@@ -1274,6 +1394,9 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
             gallery_view,
             advisory_view,
             ehr_note_box,
+            lesion_burden_view,
+            quadrant_chart_view,
+            confidence_margin_view,
         ],
     )
 
@@ -1294,6 +1417,9 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
             gallery_view,
             advisory_view,
             ehr_note_box,
+            lesion_burden_view,
+            quadrant_chart_view,
+            confidence_margin_view,
         ],
     )
 
@@ -1306,6 +1432,12 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
     )
 
     # ── Chatbot Event Handlers ──────────────────────────────────────────────
+    # -- Quick-Prompt Chip Handlers
+    chip_classify.click(fn=lambda: 'Explain why this image was classified with the current DR stage.', outputs=[chat_input])
+    chip_rule421.click(fn=lambda: 'What is the 4-2-1 rule in diabetic retinopathy?', outputs=[chat_input])
+    chip_gradcam.click(fn=lambda: 'How does Grad-CAM work and what does it highlight?', outputs=[chat_input])
+    chip_refer.click(fn=lambda: 'When should a patient be referred urgently to a retina specialist?', outputs=[chat_input])
+
     chat_send_btn.click(
         fn=respond_to_clinical_query,
         inputs=[chat_input, chatbot_widget],
