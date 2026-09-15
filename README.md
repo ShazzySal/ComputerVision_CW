@@ -5,8 +5,11 @@
 [![Gradio](https://img.shields.io/badge/Gradio-4.20%2B-green.svg)](https://gradio.app/)
 [![License](https://img.shields.io/badge/License-Academic%20Coursework-lightgrey.svg)]()
 
-> **BSc Computer Science — Computer Vision Module Coursework**  
-> **Module Weighting:** 100 Marks (Individual Coursework Deliverable)
+> **BSc (Hons) in Computing (Batch 2024.2) — Computer Vision Coursework**  
+> **Coventry University (UK) & National Institute of Business Management (NIBM)**  
+> **Student Registered Name:** M.S.F. Shazna  
+> **Coventry Index:** 16115859 | **NIBM Index:** COBSCCOMP242P-019  
+> **Assessment Weighting:** 100 Marks (Individual Project Report with Video Demonstration)
 
 ---
 
@@ -23,13 +26,13 @@ This coursework project presents an end-to-end, safety-critical computer vision 
 ## 📊 Dataset Specification
 
 * **Dataset:** [Combined DR Dataset (APTOS + IDRiD + Messidor-2 + EyePACS subset)](https://www.kaggle.com/datasets/harsha1289/combined-dr-dataset-aptosidridmessidoreyepacs)
-* **Scale:** ~21,000 digital retinal fundus photographs.
+* **Scale:** **38,034 digital retinal fundus photographs** (26,625 Train / 5,706 Val / 5,703 Test via leak-free `StratifiedGroupKFold`).
 * **Disease Staging Hierarchy (International Clinical Diabetic Retinopathy Scale):**
-  * `Stage 0`: No DR (~14,063 images)
-  * `Stage 1`: Mild Non-Proliferative DR (NPDR)
-  * `Stage 2`: Moderate Non-Proliferative DR (NPDR)
-  * `Stage 3`: Severe Non-Proliferative DR (NPDR)
-  * `Stage 4`: Proliferative DR (PDR) (~702 images)
+  * `Stage 0`: No DR (~25,411 images)
+  * `Stage 1`: Mild Non-Proliferative DR (NPDR) (~3,841 images)
+  * `Stage 2`: Moderate Non-Proliferative DR (NPDR) (~6,048 images)
+  * `Stage 3`: Severe Non-Proliferative DR (NPDR) (~1,483 images)
+  * `Stage 4`: Proliferative DR (PDR) (~1,251 images)
 * **Class Imbalance Handling:** The dataset exhibits a ~20:1 majority-to-minority imbalance ratio. This is addressed through a combination of GPU-side data augmentation and `sklearn.utils.class_weight.compute_class_weight("balanced")` applied across both training phases.
 * **Label Normalization:** Harmonizes heterogeneous naming conventions across source datasets (APTOS `diagnosis`, EyePACS `level`, IDRiD `DR_grade`) into standardized ICDR integers `[0, 4]`, with explicit validation against Messidor-2 4-level scale discrepancies.
 
