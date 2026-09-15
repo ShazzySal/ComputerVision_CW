@@ -369,8 +369,224 @@ def run_pipeline(preproc_img: np.ndarray, threshold: float = AppConfig.DEFAULT_C
     return GovernanceAgent(threshold=threshold).evaluate(diag, expl, adv)
 
 
+
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. Synthetic Realistic Fundus Demonstrators (Instant Demo Library)
+# 5. Clinical Chatbot Knowledge Base & Responder
+# ─────────────────────────────────────────────────────────────────────────────
+_CLINICAL_KB: List[Dict[str, Any]] = [
+    # ── DR Stage Descriptions ─────────────────────────────────────────────────
+    {
+        "keys": ["stage 0", "no dr", "normal", "healthy"],
+        "reply": (
+            "**Stage 0 — No Diabetic Retinopathy (No DR)**\n\n"
+            "The fundus appears normal with no microvascular abnormalities. "
+            "No retinal lesions, hemorrhages, or exudates are detected.\n\n"
+            "**Management (AAO PPP 2022):** Annual dilated fundoscopy screening. "
+            "Reinforce glycemic control (HbA1c < 7%), blood pressure < 130/80 mmHg, "
+            "and lipid optimization. No treatment intervention required."
+        ),
+    },
+    {
+        "keys": ["stage 1", "mild", "mild npdr", "microaneurysm"],
+        "reply": (
+            "**Stage 1 — Mild Non-Proliferative Diabetic Retinopathy (Mild NPDR)**\n\n"
+            "Characterized by the presence of **microaneurysms only** — outpouchings "
+            "in fragile retinal capillary walls caused by pericyte degeneration.\n\n"
+            "**Management (AAO PPP 2022):** Annual dilated fundoscopy. Intensify "
+            "systemic risk factor control. No intraocular treatment is indicated at this stage."
+        ),
+    },
+    {
+        "keys": ["stage 2", "moderate", "moderate npdr", "exudate", "cotton wool"],
+        "reply": (
+            "**Stage 2 — Moderate Non-Proliferative Diabetic Retinopathy (Moderate NPDR)**\n\n"
+            "More than microaneurysms present: dot-and-blot hemorrhages, hard exudates "
+            "(lipid leakage), and cotton-wool spots (nerve fiber layer infarcts) visible. "
+            "Does not meet the criteria for Severe NPDR.\n\n"
+            "**Management (AAO PPP 2022):** 6–12 month follow-up. Ophthalmologist referral "
+            "recommended. Evaluate for clinically significant diabetic macular edema (CSME)."
+        ),
+    },
+    {
+        "keys": ["stage 3", "severe", "severe npdr", "4-2-1", "venous beading", "irma"],
+        "reply": (
+            "**Stage 3 — Severe Non-Proliferative Diabetic Retinopathy (Severe NPDR)**\n\n"
+            "Defined by the **4-2-1 rule**: >20 intraretinal hemorrhages in all 4 quadrants, "
+            "venous beading in ≥2 quadrants, or prominent intraretinal microvascular "
+            "abnormalities (IRMA) in ≥1 quadrant.\n\n"
+            "**Management (AAO PPP 2022):** 3–4 month follow-up with retinal specialist. "
+            "High risk of progression to proliferative disease. Consider panretinal "
+            "photocoagulation (PRP) prophylactically in high-risk patients."
+        ),
+    },
+    {
+        "keys": ["stage 4", "proliferative", "pdr", "neovascularization", "vitreous hemorrhage", "nvd", "nve"],
+        "reply": (
+            "**Stage 4 — Proliferative Diabetic Retinopathy (PDR)**\n\n"
+            "The most advanced stage. VEGF-driven **neovascularization** breaches the "
+            "internal limiting membrane producing fragile new vessels on the disc (NVD) "
+            "or retina (NVE). Untreated, this leads to vitreous hemorrhage, fibrovascular "
+            "proliferation, tractional retinal detachment, and irreversible blindness.\n\n"
+            "**Management (AAO PPP 2022):** Urgent ophthalmologist referral within 1–2 weeks. "
+            "Panretinal photocoagulation (PRP) or intravitreal anti-VEGF injections "
+            "(ranibizumab, bevacizumab) are first-line treatments."
+        ),
+    },
+    # ── Model Architecture FAQs ───────────────────────────────────────────────
+    {
+        "keys": ["efficientnet", "backbone", "architecture", "model", "network", "cnn"],
+        "reply": (
+            "**EfficientNetB3 — Deep Learning Backbone**\n\n"
+            "RetinaGuard uses **EfficientNetB3** pre-trained on ImageNet as its convolutional "
+            "backbone. EfficientNet applies **compound scaling** — simultaneously scaling "
+            "depth, width, and resolution using a fixed ratio — achieving superior "
+            "accuracy/parameter efficiency vs ResNet, DenseNet, or VGG.\n\n"
+            "A custom classification head is added:\n"
+            "`GAP → BatchNorm → Dense(256, ReLU) → Dropout(0.3) → Dense(5, Softmax)`\n\n"
+            "Training uses **2-phase transfer learning**:\n"
+            "- Phase 1 (15 epochs, LR=1e-3): Base frozen, head trained.\n"
+            "- Phase 2 (25 epochs, LR=1e-5): Top 30 base layers unfrozen for fine-tuning."
+        ),
+    },
+    {
+        "keys": ["grad-cam", "gradcam", "heatmap", "saliency", "explainability", "layer 2"],
+        "reply": (
+            "**Grad-CAM — Layer 2 Regional Explainability**\n\n"
+            "Gradient-weighted Class Activation Mapping (Grad-CAM) computes a 2D saliency "
+            "heatmap by backpropagating gradients through the final convolutional layer "
+            "(`top_activation` in EfficientNetB3) using `tf.GradientTape`.\n\n"
+            "The heatmap identifies **which anatomical regions drove the classification** "
+            "— e.g. the optic disc, macular area, or peripheral microaneurysm clusters. "
+            "This provides radiologist-level regional accountability for every prediction.\n\n"
+            "The overlay uses a Jet colormap: red = highest activation, blue = lowest."
+        ),
+    },
+    {
+        "keys": ["unet", "u-net", "segmentation", "lesion", "layer 3", "mask"],
+        "reply": (
+            "**Auxiliary U-Net — Layer 3 Pixel-Level Lesion Segmentation**\n\n"
+            "A symmetrical U-Net architecture provides pixel-level lesion contours "
+            "(microaneurysms, exudates highlighted in fluorescent green).\n\n"
+            "Because the 38,034-image dataset lacks manual pixel-level annotations, "
+            "masks are synthesized via a **semi-supervised self-distillation pipeline**:\n"
+            "1. Green-channel optical extraction (best hemoglobin contrast).\n"
+            "2. Morphological Top-Hat (bright exudates) + Black-Hat (dark microaneurysms).\n"
+            "3. Grad-CAM saliency gating (threshold > 0.35) to discard non-pathological edges.\n\n"
+            "The U-Net is trained with a **Hybrid Soft Dice + BCE Loss** to handle "
+            "the extreme class imbalance (<2% lesion pixels)."
+        ),
+    },
+    {
+        "keys": ["governance", "safety gate", "flag", "threshold", "confidence", "override"],
+        "reply": (
+            "**GovernanceAgent — Active Clinical Safety Gate**\n\n"
+            "Unlike passive warning banners, the `GovernanceAgent` **actively intercepts** "
+            "the pipeline when model confidence falls below the configurable threshold "
+            "(default: 70%).\n\n"
+            "When triggered:\n"
+            "- Automated treatment guidance is **withheld entirely**.\n"
+            "- `flagged_for_review: True` is set.\n"
+            "- The case is rerouted to **mandatory human ophthalmologist triage**.\n\n"
+            "This mirrors clinical safety governance patterns in defense medical AI systems "
+            "and prevents hallucination-driven misdiagnosis on ambiguous or out-of-distribution images."
+        ),
+    },
+    {
+        "keys": ["cbr", "case-based reasoning", "similar cases", "embedding", "retrieval", "nearest neighbor"],
+        "reply": (
+            "**Case-Based Reasoning (CBR) — Similar Case Retrieval**\n\n"
+            "After diagnosis, RetinaGuard extracts a **256-dimensional feature vector** "
+            "from the penultimate dense layer (`head_dense`) of the classifier.\n\n"
+            "This embedding is compared against 50 pre-cached reference case embeddings "
+            "stored in `embeddings.npz` using **cosine similarity**. The top-3 most "
+            "similar historical cases are retrieved and displayed with their DR stages.\n\n"
+            "This provides clinicians with precedent-based diagnostic context, "
+            "supporting decision transparency."
+        ),
+    },
+    {
+        "keys": ["ben graham", "preprocessing", "preprocessing pipeline", "crop", "normalization"],
+        "reply": (
+            "**Preprocessing Pipeline — 4-Step Optical Standardization**\n\n"
+            "1. **Circular Border Crop:** Strips non-informative black optical borders "
+            "using luminance thresholding (green channel > 7).\n"
+            "2. **Ben Graham Enhancement:** Applies spatial frequency subtraction:\n"
+            "   `I_norm = 4×I − 4×GaussianBlur(I, σ=10) + 128`\n"
+            "   This eliminates global illumination gradients and reveals micro-vascular detail.\n"
+            "3. **Resize:** All images standardized to 224×224 pixels.\n"
+            "4. **Normalization:** Pixel values scaled to [0, 1] float32."
+        ),
+    },
+    {
+        "keys": ["kappa", "qwk", "quadratic weighted kappa", "metric", "evaluation"],
+        "reply": (
+            "**Quadratic Weighted Kappa (QWK) — Ordinal Evaluation Metric**\n\n"
+            "Standard accuracy treats all misclassifications equally. In clinical DR grading, "
+            "confusing Stage 0 (No DR) with Stage 4 (Proliferative) is catastrophically "
+            "worse than confusing Stage 1 with Stage 2.\n\n"
+            "QWK assigns **quadratic penalty weights** proportional to the distance between "
+            "the predicted and true stage. A kappa of 1.0 = perfect agreement; "
+            "0.0 = chance agreement; <0 = worse than chance.\n\n"
+            "RetinaGuard achieves a QWK of ~0.842, indicating substantial clinical agreement."
+        ),
+    },
+    {
+        "keys": ["refer", "referral", "when to refer", "specialist", "urgency"],
+        "reply": (
+            "**Clinical Referral Guidelines (AAO PPP 2022)**\n\n"
+            "| DR Stage | Referral Urgency | Recall Interval |\n"
+            "|---|---|---|\n"
+            "| Stage 0 — No DR | No referral needed | 12 months |\n"
+            "| Stage 1 — Mild NPDR | No immediate referral | 12 months |\n"
+            "| Stage 2 — Moderate NPDR | Ophthalmologist referral recommended | 6–12 months |\n"
+            "| Stage 3 — Severe NPDR | Retinal specialist referral | 3–4 months |\n"
+            "| Stage 4 — Proliferative DR | **Urgent referral within 1–2 weeks** | ASAP |\n\n"
+            "⚠️ *This tool is assistive clinical decision support only. All referral "
+            "decisions must be confirmed by a qualified ophthalmologist.*"
+        ),
+    },
+    {
+        "keys": ["dataset", "data", "kaggle", "aptos", "idrid", "messidor", "eyepacs", "38034", "38,034"],
+        "reply": (
+            "**Dataset — 38,034-Image Multi-Source Fundus Cohort**\n\n"
+            "RetinaGuard is trained on the **Combined DR Dataset** (Harsha, 2020) from Kaggle, "
+            "pooling four internationally recognized ophthalmic cohorts:\n\n"
+            "1. **APTOS 2019:** Rural Indian clinic screening, multi-camera variability.\n"
+            "2. **IDRiD:** Gold-standard Indian clinical staging with sub-lesion verification.\n"
+            "3. **Messidor-2:** European multi-hospital 3-CCD camera study.\n"
+            "4. **EyePACS Subset:** US population-scale real-world screening repository.\n\n"
+            "Total: **38,034 annotations** split 70/15/15 (Train/Val/Test) using "
+            "`StratifiedGroupKFold` with patient-level grouping to prevent bilateral eye leakage."
+        ),
+    },
+]
+
+_CHATBOT_FALLBACK = (
+    "I don't have a specific answer for that query in my clinical knowledge base. "
+    "For questions about diabetic retinopathy management, please consult the "
+    "**AAO Preferred Practice Patterns (2022)** or a qualified ophthalmologist.\n\n"
+    "You can ask me about: DR stages (0–4), Grad-CAM, the U-Net segmentation, "
+    "the Governance Agent, Case-Based Reasoning, the preprocessing pipeline, "
+    "Quadratic Weighted Kappa, referral guidelines, or the training dataset."
+)
+
+
+def respond_to_clinical_query(message: str, history: List) -> tuple:
+    """Rule-based clinical knowledge chatbot for DR staging and model architecture queries."""
+    if not message or not message.strip():
+        return history, ""
+    query = message.lower().strip()
+    reply = _CHATBOT_FALLBACK
+    for entry in _CLINICAL_KB:
+        if any(kw in query for kw in entry["keys"]):
+            reply = entry["reply"]
+            break
+    history = history + [[message, reply]]
+    return history, ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. Synthetic Realistic Fundus Demonstrators (Instant Demo Library)
 # ─────────────────────────────────────────────────────────────────────────────
 def create_sample_fundus(stage: int = 0) -> np.ndarray:
     """Generates realistic synthetic retinal fundus images for instant offline demonstration."""
@@ -422,7 +638,7 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float):
     if img is None:
         empty_img = np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3), dtype=np.uint8)
         notice = "<div class='card warning-card'>⚠️ <strong>Please upload a retinal fundus photograph</strong> or click one of the quick-load sample buttons on the left.</div>"
-        return notice, {}, empty_img, empty_img, "", [], "", ""
+        return notice, "", {}, empty_img, empty_img, "", [], "", ""
 
     preproc = preprocess_image(img)
     result = run_pipeline(preproc, threshold=threshold)
@@ -946,15 +1162,42 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                     gr.Markdown("### 📄 Exportable Electronic Health Record (EHR) Summary Note")
                     ehr_note_box = gr.Textbox(label="Clinical Session Note (Copy to Clipboard)", lines=12, interactive=False)
 
-                # Tab 4: System Architecture & SaMD Guidelines
-                with gr.TabItem("ℹ️ Clinical Architecture & SaMD Info"):
-                    gr.Markdown(r"""
-                    ### Clinical Decision Support System Specifications:
-                    * **Deep Learning Backbone:** EfficientNetB3 initialized with ImageNet representations and fine-tuned on ~21,000 multi-source fundus images.
-                    * **Ordinal Metric:** Evaluated via **Quadratic Weighted Kappa (QWK)** ($\kappa$) to quadratically penalize clinically dangerous multi-stage misclassifications.
-                    * **Active Safety Gate:** Autonomous `GovernanceAgent` that intercepts predictions when confidence drops below the threshold, withholding automated guidance and routing to human specialist triage.
-                    * **Regulatory Category:** SaMD (Software as a Medical Device) — Assistive Clinical Decision Support (FDA 21 CFR 860 / EU AI Act Class IIa).
+                # Tab 4: AI Clinical Chatbot & SaMD Guidelines
+                with gr.TabItem("💬 AI Clinical Chatbot"):
+                    gr.Markdown("""
+                    ### 🤖 RetinaGuard Clinical Knowledge Assistant
+                    Ask any question about diabetic retinopathy stages, the model architecture, preprocessing pipeline,
+                    or clinical management guidelines. The assistant references the AAO Preferred Practice Patterns.
+
+                    *Example questions: "What does Stage 3 mean?", "When should I refer a proliferative patient?",
+                    "How does Grad-CAM work?", "What is the Governance Agent?"*
                     """)
+                    with gr.Row():
+                        with gr.Column(scale=3):
+                            chatbot_widget = gr.Chatbot(
+                                label="Clinical Knowledge Assistant",
+                                height=420,
+                                bubble_full_width=False,
+                                show_copy_button=True,
+                            )
+                            with gr.Row():
+                                chat_input = gr.Textbox(
+                                    placeholder="Ask a question about DR staging, the model, or clinical guidelines…",
+                                    label="",
+                                    scale=5,
+                                    container=False,
+                                )
+                                chat_send_btn = gr.Button("Send", variant="primary", scale=1)
+                            chat_clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
+                        with gr.Column(scale=2):
+                            gr.Markdown(r"""
+                            ### ⚙️ System Specifications:
+                            * **Deep Learning Backbone:** EfficientNetB3 fine-tuned on **38,034** multi-source fundus images (APTOS + IDRiD + Messidor-2 + EyePACS).
+                            * **Ordinal Metric:** Evaluated via **Quadratic Weighted Kappa (QWK)** ($\kappa$) to quadratically penalize clinically dangerous multi-stage misclassifications.
+                            * **Active Safety Gate:** Autonomous `GovernanceAgent` intercepts low-confidence predictions and routes to mandatory human specialist triage.
+                            * **Regulatory Category:** SaMD (Software as a Medical Device) — Assistive Clinical Decision Support (FDA 21 CFR 860 / EU AI Act Class IIa).
+                            """)
+
 
     # ─────────────────────────────────────────────────────────────────────────
     # 8. Event Connections
@@ -1061,6 +1304,19 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
         outputs=None,
         js=THEME_TOGGLE_JS,
     )
+
+    # ── Chatbot Event Handlers ──────────────────────────────────────────────
+    chat_send_btn.click(
+        fn=respond_to_clinical_query,
+        inputs=[chat_input, chatbot_widget],
+        outputs=[chatbot_widget, chat_input],
+    )
+    chat_input.submit(
+        fn=respond_to_clinical_query,
+        inputs=[chat_input, chatbot_widget],
+        outputs=[chatbot_widget, chat_input],
+    )
+    chat_clear_btn.click(fn=lambda: ([], ""), outputs=[chatbot_widget, chat_input])
 
 
 if __name__ == "__main__":
