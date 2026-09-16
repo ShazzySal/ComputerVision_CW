@@ -50,6 +50,7 @@ class AppConfig:
     DEFAULT_CONFIDENCE_THRESHOLD: float = 0.70
     
     WEIGHTS_PATH: str = "checkpoints/best_phase2.weights.h5"
+    UNET_WEIGHTS_PATH: str = "checkpoints/unet_lesion_best.weights.h5"
     EMBEDDINGS_PATH: str = "embeddings.npz"
 
 
@@ -172,7 +173,14 @@ def build_auxiliary_unet():
     cat1 = layers.concatenate([u1, c1])
     d1 = layers.Conv2D(32, (3, 3), padding="same", activation="relu")(cat1)
     out = layers.Conv2D(1, (1, 1), activation="sigmoid")(d1)
-    return keras.Model(inputs=inputs, outputs=out, name="Auxiliary_UNet")
+    m = keras.Model(inputs=inputs, outputs=out, name="Auxiliary_UNet")
+    if os.path.exists(AppConfig.UNET_WEIGHTS_PATH):
+        try:
+            m.load_weights(AppConfig.UNET_WEIGHTS_PATH)
+            print("[U-Net] Auxiliary lesion segmentation weights loaded.")
+        except Exception:
+            pass
+    return m
 
 
 unet_model = build_auxiliary_unet()
