@@ -103,10 +103,21 @@ def preprocess_image(image_input: Union[str, np.ndarray]) -> np.ndarray:
             raise ValueError(f"Could not load image: {image_input}")
         img = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
     else:
-        img = image_input.copy()
+        img = np.asarray(image_input)
+
+    if img.size == 0:
+        raise ValueError("Input image is empty.")
+    if img.ndim not in (2, 3):
+        raise ValueError(f"Unsupported image shape: {img.shape}. Expected 2D grayscale or 3D RGB/RGBA array.")
+    if img.ndim == 3 and img.shape[0] == 0 or img.shape[1] == 0:
+        raise ValueError(f"Input image has a zero-sized dimension: {img.shape}.")
+    if img.ndim == 3 and img.shape[2] not in (1, 3, 4):
+        raise ValueError(f"Unsupported channel count: {img.shape[2]}. Expected 1, 3, or 4 channels.")
 
     # Normalize channels to 3-channel RGB (handle grayscale 2D/3D and RGBA 4D)
     if img.ndim == 2:
+        if img.shape[0] == 0 or img.shape[1] == 0:
+            raise ValueError(f"Invalid image dimensions: {img.shape}.")
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
     elif img.ndim == 3 and img.shape[2] == 4:
         img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
@@ -114,6 +125,8 @@ def preprocess_image(image_input: Union[str, np.ndarray]) -> np.ndarray:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
 
     cropped = crop_image_from_gray(img)
+    if cropped.size == 0 or cropped.shape[0] == 0 or cropped.shape[1] == 0:
+        raise ValueError(f"Image crop produced an empty result: {cropped.shape}.")
     h, w = cropped.shape[:2]
     interp = cv2.INTER_AREA if (h > AppConfig.IMG_SIZE or w > AppConfig.IMG_SIZE) else cv2.INTER_LINEAR
     resized = cv2.resize(cropped, (AppConfig.IMG_SIZE, AppConfig.IMG_SIZE), interpolation=interp)
@@ -662,12 +675,20 @@ STAGE_BADGE_COLORS = {
 
 def analyze_fundus(img: Optional[np.ndarray], threshold: float):
     """Primary analysis handler that executes the pipeline and populates modern UI widgets."""
+    empty_img = np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3), dtype=np.uint8)
     if img is None:
-        empty_img = np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3), dtype=np.uint8)
         notice = "<div class='card warning-card'>⚠️ <strong>Please upload a retinal fundus photograph</strong> or click one of the quick-load sample buttons on the left.</div>"
         return notice, "", {}, empty_img, empty_img, "", [], "", "", "", "", ""
 
-    preproc = preprocess_image(img)
+    try:
+        preproc = preprocess_image(img)
+    except ValueError as exc:
+        notice = (
+            "<div class='card warning-card'>⚠️ <strong>Invalid fundus image input</strong> — "
+            f"{exc}. Please upload a valid retina image or choose a sample fundus from the quick-load buttons.</div>"
+        )
+        return notice, "", {}, empty_img, empty_img, "", [], "", "", "", "", ""
+
     result = run_pipeline(preproc, threshold=threshold)
 
     diag = result["diagnosis"]
