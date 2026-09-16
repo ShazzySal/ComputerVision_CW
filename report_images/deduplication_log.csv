@@ -1,0 +1,9 @@
+metric,value,description
+total_images_evaluated,"38,034","Total images across APTOS, IDRiD, Messidor-2, and EyePACS"
+hashes_computed,"38,034",Successfully computed 64-bit DCT perceptual hashes (pHash)
+unreadable_failed_images,0,Unreadable or corrupted image files
+exact_duplicate_groups,142,Clusters with identical pHash (Hamming distance = 0)
+images_in_exact_duplicates,294,Total image instances participating in exact duplicate clusters
+near_duplicate_pairs_screened,87,Image pairs with Hamming distance 1-5 within same ICDR stage
+cross_split_boundary_leaks,0,Exact or near-duplicate pairs crossing Train/Val/Test splits
+cross_split_leak_resolution,ZERO_LEAKAGE_CONFIRMED,Patient-level grouping (StratifiedGroupKFold) contained all bilateral and longitudinal duplicates within the same split
