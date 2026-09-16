@@ -105,6 +105,14 @@ def preprocess_image(image_input: Union[str, np.ndarray]) -> np.ndarray:
     else:
         img = image_input.copy()
 
+    # Normalize channels to 3-channel RGB (handle grayscale 2D/3D and RGBA 4D)
+    if img.ndim == 2:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+    elif img.ndim == 3 and img.shape[2] == 4:
+        img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
+    elif img.ndim == 3 and img.shape[2] == 1:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+
     cropped = crop_image_from_gray(img)
     h, w = cropped.shape[:2]
     interp = cv2.INTER_AREA if (h > AppConfig.IMG_SIZE or w > AppConfig.IMG_SIZE) else cv2.INTER_LINEAR
