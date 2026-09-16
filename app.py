@@ -155,9 +155,11 @@ def build_classifier():
     if os.path.exists(AppConfig.WEIGHTS_PATH):
         try:
             m.load_weights(AppConfig.WEIGHTS_PATH)
-            print("[Model] Fine-tuned checkpoint loaded.")
-        except Exception:
-            pass
+            print(f"[Model] Fine-tuned checkpoint loaded successfully from {AppConfig.WEIGHTS_PATH}.")
+        except Exception as exc:
+            print(f"[Model WARNING] Failed to load checkpoint weights ({exc}). Falling back to ImageNet initialization.")
+    else:
+        print(f"[Model WARNING] Checkpoint file '{AppConfig.WEIGHTS_PATH}' not found. Serving in uncalibrated ImageNet demo mode.")
     return m, base_m
 
 
@@ -198,9 +200,11 @@ def build_auxiliary_unet():
     if os.path.exists(AppConfig.UNET_WEIGHTS_PATH):
         try:
             m.load_weights(AppConfig.UNET_WEIGHTS_PATH)
-            print("[U-Net] Auxiliary lesion segmentation weights loaded.")
-        except Exception:
-            pass
+            print(f"[U-Net] Auxiliary lesion segmentation weights loaded successfully from {AppConfig.UNET_WEIGHTS_PATH}.")
+        except Exception as exc:
+            print(f"[U-Net WARNING] Failed to load U-Net weights ({exc}). Falling back to heuristic segmentation.")
+    else:
+        print(f"[U-Net WARNING] Checkpoint file '{AppConfig.UNET_WEIGHTS_PATH}' not found. Serving in heuristic segmentation mode.")
     return m
 
 
@@ -1259,7 +1263,9 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
             hba1c_level = gr.Slider(minimum=5.0, maximum=14.0, value=7.5, step=0.1, label="HbA1c (%)")
             diabetes_duration = gr.Slider(minimum=0, maximum=40, value=10, step=1, label="Duration of Diabetes (years)")
             gr.Markdown("---")
-            submit_btn = gr.Button("🚀 Run End-to-End Diagnostic Analysis", variant="primary", size="lg", elem_classes=["action-btn"])
+            with gr.Row():
+                submit_btn = gr.Button("🚀 Run Diagnostic Analysis", variant="primary", size="lg", scale=3, elem_classes=["action-btn"])
+                btn_clear = gr.Button("🔄 Reset", variant="secondary", size="lg", scale=1)
 
         # Right Column: Multi-Tab Clinical Dossier
         with gr.Column(scale=6):
@@ -1350,6 +1356,66 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
     # ─────────────────────────────────────────────────────────────────────────
     # Main Analysis Event
     submit_btn.click(
+        fn=analyze_fundus,
+        inputs=[input_image, threshold_slider],
+        outputs=[
+            status_banner,
+            hero_diagnosis,
+            prob_distribution,
+            overlay_cam_view,
+            lesion_seg_view,
+            quadrant_text,
+            gallery_view,
+            advisory_view,
+            ehr_note_box,
+            lesion_burden_view,
+            quadrant_chart_view,
+            confidence_margin_view,
+        ],
+    )
+
+    def reset_workspace():
+        empty_img = np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3), dtype=np.uint8)
+        initial_banner = "<div class='card'><em>Upload a retinal fundus photograph or click a quick-load sample to begin.</em></div>"
+        return (
+            None,
+            0.70,
+            initial_banner,
+            "",
+            {},
+            empty_img,
+            empty_img,
+            "",
+            [],
+            "",
+            "",
+            "",
+            "",
+            "",
+        )
+
+    btn_clear.click(
+        fn=reset_workspace,
+        outputs=[
+            input_image,
+            threshold_slider,
+            status_banner,
+            hero_diagnosis,
+            prob_distribution,
+            overlay_cam_view,
+            lesion_seg_view,
+            quadrant_text,
+            gallery_view,
+            advisory_view,
+            ehr_note_box,
+            lesion_burden_view,
+            quadrant_chart_view,
+            confidence_margin_view,
+        ],
+    )
+
+    # Live threshold adjustment re-evaluates active prediction upon release
+    threshold_slider.release(
         fn=analyze_fundus,
         inputs=[input_image, threshold_slider],
         outputs=[
