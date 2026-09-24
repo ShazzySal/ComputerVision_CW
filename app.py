@@ -2189,65 +2189,24 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
     _diag_followup_state = gr.State("")
     _diag_plan_state = gr.State("")
 
-    # ── Compact top strip: title + telemetry + stepper all-in-one ──────
+    # ── Top Title Strip ──────
     gr.HTML("""
-    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
-
-        <!-- Row 1: Title + Toggle + Tech badge -->
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span style="font-size:20px;">👁️</span>
-                <div>
-                    <div class="header-title" style="font-size:17px; font-weight:800; letter-spacing:-0.3px; margin:0; line-height:1.1;">
-                        RetinaGuard AI <span style="color:#0d9488; font-weight:600;">Clinical Decision Support</span>
-                    </div>
-                    <div class="header-subtitle" style="font-size:11px; margin:0;">
-                        Multi-Stage Diabetic Retinopathy Pipeline &bull; BSc (Hons) Computer Science
-                    </div>
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid rgba(226,232,240,0.6);">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:22px;">👁️</span>
+            <div>
+                <div class="header-title" style="font-size:18px; font-weight:800; letter-spacing:-0.3px; margin:0; line-height:1.1;">
+                    RetinaGuard AI <span style="color:#0d9488; font-weight:600;">Clinical Decision Support</span>
+                </div>
+                <div class="header-subtitle" style="font-size:11px; margin:0; color:#64748b;">
+                    Multi-Stage Diabetic Retinopathy Pipeline &bull; BSc (Hons) Computer Science
                 </div>
             </div>
-            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <span style="background:#e0f2fe; color:#0369a1; padding:3px 9px; border-radius:6px; font-weight:700; font-size:11px; white-space:nowrap;">
-                    EfficientNetB3 &bull; Grad-CAM &bull; U-Net &bull; CBR
-                </span>
-            </div>
         </div>
-
-        <!-- Row 2: Telemetry strip -->
-        <div style="display:flex; align-items:center; justify-content:space-between; background:#0f172a; border:1px solid #1e293b; border-radius:8px; padding:7px 14px; flex-wrap:wrap; gap:6px;">
-            <div style="display:flex; align-items:center; gap:7px;">
-                <div class="pulse-dot"></div>
-                <strong style="color:#f8fafc; font-size:11px; letter-spacing:0.4px;">MULTI-AGENT TELEMETRY</strong>
-            </div>
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <div class="telemetry-badge">🩺 DiagnosisAgent: <strong>Online</strong></div>
-                <div class="telemetry-badge">🔬 ExplainabilityAgent: <strong>Online</strong></div>
-                <div class="telemetry-badge">📋 AdvisoryAgent: <strong>Online</strong></div>
-                <div class="telemetry-badge" style="border-color:#38bdf8;">🛡️ GovernanceGate: <strong>Active</strong></div>
-            </div>
-        </div>
-
-        <!-- Row 3: Compact stepper -->
-        <div class="stepper-container" style="padding:7px 14px; margin-bottom:0;">
-            <div class="stepper-item">
-                <span class="stepper-circle">01</span>
-                <div><div class="stepper-title">INTAKE</div><div class="stepper-sub">Patient &amp; HbA1c</div></div>
-            </div>
-            <div class="stepper-arrow">➔</div>
-            <div class="stepper-item">
-                <span class="stepper-circle">02</span>
-                <div><div class="stepper-title">IMAGE</div><div class="stepper-sub">Quality Check</div></div>
-            </div>
-            <div class="stepper-arrow">➔</div>
-            <div class="stepper-item">
-                <span class="stepper-circle">03</span>
-                <div><div class="stepper-title">SAFETY GATE</div><div class="stepper-sub">Threshold &amp; Override</div></div>
-            </div>
-            <div class="stepper-arrow">➔</div>
-            <div class="stepper-item">
-                <span class="stepper-circle">04</span>
-                <div><div class="stepper-title">DOSSIER</div><div class="stepper-sub">Triage &amp; Risk</div></div>
-            </div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span style="background:#e0f2fe; color:#0369a1; padding:3px 9px; border-radius:6px; font-weight:700; font-size:11px; white-space:nowrap;">
+                EfficientNetB3 &bull; Grad-CAM &bull; U-Net &bull; CBR
+            </span>
         </div>
     </div>
     """)
@@ -2256,24 +2215,6 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
     with gr.Row():
         # Left Column: Upload & Governance Configuration
         with gr.Column(scale=4):
-            gr.HTML("""
-            <div class="patient-id-card" style="padding:6px 10px; margin-bottom:8px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:5px; margin-bottom:5px;">
-                    <div>
-                        <div style="font-size:10px; color:#64748b; font-weight:800; text-transform:uppercase;">EHR Active Screening Record</div>
-                        <div style="font-size:13px; font-weight:800; color:#0f172a;">MRN: RG-2026-9812 &bull; Test Patient</div>
-                    </div>
-                    <span class="badge-quota">⚡ 99 SCANS LEFT</span>
-                </div>
-                <div style="display:flex; flex-wrap:wrap; gap:5px;">
-                    <span class="patient-chip">👤 Age: 55y</span>
-                    <span class="patient-chip">🩺 Type 2 DM</span>
-                    <span class="patient-chip">⏳ 10 Years</span>
-                    <span class="patient-chip">🩸 HbA1c: 7.5%</span>
-                    <span class="patient-chip">💓 BP: 135 mmHg</span>
-                </div>
-            </div>
-            """)
             input_image = gr.Image(label="📥 Upload Fundus Photo", type="numpy", height=210)
 
             # Quick Preset Buttons
