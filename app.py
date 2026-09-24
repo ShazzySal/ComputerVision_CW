@@ -1128,18 +1128,40 @@ def compare_longitudinal_images(previous: Optional[np.ndarray], current: Optiona
 CUSTOM_CSS = """
 <style>
 /* Medical Dashboard Base Styling */
+html, body {
+    overflow-x: hidden !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+    transition: background-color 0.25s ease, color 0.25s ease;
+}
+.dark, html.dark, body.dark {
+    background-color: #0b1120 !important;
+    color: #f8fafc !important;
+}
+
+gradio-app {
+    overflow-x: hidden !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    background-color: transparent !important;
+}
+
 .gradio-container {
-    max-width: 1280px !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
     transition: background-color 0.3s ease, color 0.3s ease;
+    box-sizing: border-box !important;
 }
 
 /* Header Telemetry Styling */
 .telemetry-bar {
     display: flex;
     gap: 12px;
-    background: #0f172a;
-    color: #f8fafc;
+    background: #ffffff;
+    color: #0f172a;
     padding: 10px 16px;
     border-radius: 8px;
     font-size: 12px;
@@ -1147,22 +1169,34 @@ CUSTOM_CSS = """
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    border: 1px solid #1e293b;
-    color: #f8fafc !important;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
-.dark .telemetry-bar {
-    background: #020617;
-    border: 1px solid #1e293b;
+.telemetry-bar strong {
+    color: #0f172a !important;
 }
 .telemetry-badge {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: #1e293b;
+    background: #f1f5f9;
     padding: 4px 10px;
     border-radius: 6px;
-    border: 1px solid #334155;
+    border: 1px solid #cbd5e1;
     font-weight: 500;
+    color: #334155 !important;
+}
+.dark .telemetry-bar {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    box-shadow: none;
+}
+.dark .telemetry-bar strong {
+    color: #f8fafc !important;
+}
+.dark .telemetry-badge {
+    background: #1e293b;
+    border: 1px solid #334155;
     color: #f8fafc !important;
 }
 .pulse-dot {
@@ -1337,21 +1371,23 @@ CUSTOM_CSS = """
     font-weight: 700 !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    background: #1e293b !important;
-    color: #f8fafc !important;
-    border: 1px solid #475569 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
 }
 .theme-toggle-btn:hover {
-    background: #334155 !important;
+    background: #f1f5f9 !important;
     transform: translateY(-1px);
 }
 .dark .theme-toggle-btn {
-    background: #f8fafc !important;
-    color: #0f172a !important;
-    border: 1px solid #cbd5e1 !important;
+    background: #1e293b !important;
+    color: #f8fafc !important;
+    border: 1px solid #475569 !important;
+    box-shadow: none !important;
 }
 .dark .theme-toggle-btn:hover {
-    background: #e2e8f0 !important;
+    background: #334155 !important;
 }
 
 /* Button & Tool Enhancements */
@@ -1461,18 +1497,15 @@ CUSTOM_CSS = """
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #042f2e;
-    border: 1px solid #115e59;
+    background: #f0fdfa;
+    border: 1px solid #a7f3d0;
     border-radius: 10px;
     padding: 10px 18px;
     margin-bottom: 16px;
-    color: #f0fdfa !important;
+    color: #065f46 !important;
     flex-wrap: wrap;
     gap: 8px;
-}
-.dark .stepper-container {
-    background: #022c22;
-    border-color: #134e4a;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
 .stepper-item {
     display: flex;
@@ -1495,17 +1528,31 @@ CUSTOM_CSS = """
     font-size: 11.5px;
     font-weight: 800;
     letter-spacing: 0.5px;
-    color: #ccfbf1 !important;
+    color: #065f46 !important;
 }
 .stepper-sub {
     font-size: 10px;
-    color: #99f6e4 !important;
+    color: #047857 !important;
     opacity: 0.85;
 }
 .stepper-arrow {
-    color: #2dd4bf !important;
+    color: #059669 !important;
     font-weight: 800;
     font-size: 14px;
+}
+.dark .stepper-container {
+    background: #022c22;
+    border-color: #134e4a;
+    box-shadow: none;
+}
+.dark .stepper-title {
+    color: #ccfbf1 !important;
+}
+.dark .stepper-sub {
+    color: #99f6e4 !important;
+}
+.dark .stepper-arrow {
+    color: #2dd4bf !important;
 }
 
 /* Medios Patient EHR Card */
@@ -1515,10 +1562,12 @@ CUSTOM_CSS = """
     border: 1px solid #e2e8f0;
     padding: 12px 14px;
     margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 .dark .patient-id-card {
-    background: #0f172a;
+    background: #1e293b;
     border-color: #334155;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
 }
 .badge-quota {
     background: #ecfdf5;
@@ -1545,24 +1594,79 @@ CUSTOM_CSS = """
     border-radius: 6px;
     font-size: 11px;
     font-weight: 600;
+    border: 1px solid #e2e8f0;
 }
 .dark .patient-chip {
     background: #1e293b;
     color: #cbd5e1;
+    border-color: #334155;
 }
 
 /* Medios SaMD Regulatory Card */
 .medios-disclaimer-card {
-    background: #042f2e;
-    border: 1px solid #115e59;
+    background: #f0fdfa;
+    border: 1px solid #99f6e4;
     border-radius: 10px;
     padding: 12px 16px;
     margin-top: 14px;
-    color: #ccfbf1;
+    color: #0f766e;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+.medios-disclaimer-card .disclaimer-title {
+    color: #0d9488 !important;
+}
+.medios-disclaimer-card .disclaimer-body {
+    color: #134e4a !important;
 }
 .dark .medios-disclaimer-card {
     background: #022c22;
     border-color: #134e4a;
+    color: #ccfbf1;
+    box-shadow: none;
+}
+.dark .medios-disclaimer-card .disclaimer-title {
+    color: #2dd4bf !important;
+}
+.dark .medios-disclaimer-card .disclaimer-body {
+    color: #ccfbf1 !important;
+}
+
+/* Gradio Tab Bar Styling */
+.tabs > .tab-nav {
+    border-bottom: 2px solid #e2e8f0 !important;
+    gap: 6px !important;
+}
+.dark .tabs > .tab-nav {
+    border-bottom: 2px solid #1e293b !important;
+}
+.tabs > .tab-nav > button {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+    padding: 8px 14px !important;
+    border-radius: 6px 6px 0 0 !important;
+    transition: all 0.15s ease !important;
+    background: transparent !important;
+}
+.tabs > .tab-nav > button:hover {
+    color: #0d9488 !important;
+    background: #f1f5f9 !important;
+}
+.tabs > .tab-nav > button.selected {
+    color: #0d9488 !important;
+    border-bottom: 2px solid #0d9488 !important;
+    font-weight: 700 !important;
+}
+.dark .tabs > .tab-nav > button {
+    color: #94a3b8 !important;
+}
+.dark .tabs > .tab-nav > button:hover {
+    color: #2dd4bf !important;
+    background: #1e293b !important;
+}
+.dark .tabs > .tab-nav > button.selected {
+    color: #2dd4bf !important;
+    border-bottom: 2px solid #0d9488 !important;
 }
 
 /* ── Left Sidebar Navigation (ProvoHeal Inspired) ─────────────────── */
@@ -1761,13 +1865,41 @@ CUSTOM_CSS = """
     color: #f8fafc !important;
     border-color: #38bdf8 !important;
 }
-/* Push main Gradio container right to make room for sidebar */
+/* Floating chat pill bottom-right */
+.rg-floating-chat-pill {
+    position: fixed !important;
+    right: 24px !important;
+    bottom: 24px !important;
+    z-index: 99999 !important;
+    background: linear-gradient(135deg, #0d9488, #0284c7) !important;
+    color: #ffffff !important;
+    padding: 10px 18px !important;
+    border-radius: 999px !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 6px 20px rgba(13, 148, 136, 0.45) !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+.rg-floating-chat-pill:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 26px rgba(13, 148, 136, 0.6) !important;
+}
+
+/* Push main Gradio container right to make room for sidebar - ZERO horizontal scroll */
 @media (min-width: 901px) {
-    gradio-app, .gradio-container {
+    .gradio-container {
         margin-left: 240px !important;
-        max-width: calc(100vw - 260px) !important;
-        width: calc(100vw - 260px) !important;
-        padding-left: 8px !important;
+        margin-right: 0 !important;
+        width: calc(100% - 240px) !important;
+        max-width: calc(100% - 240px) !important;
+        padding-left: 18px !important;
+        padding-right: 24px !important;
+        box-sizing: border-box !important;
     }
 }
 @media (max-width: 900px) {
@@ -1789,15 +1921,33 @@ CUSTOM_CSS = """
         justify-content: center !important;
         padding: 10px !important;
     }
-    gradio-app, .gradio-container {
-        margin-left: 65px !important;
-        max-width: calc(100vw - 75px) !important;
-        width: calc(100vw - 75px) !important;
+    .gradio-container {
+        margin-left: 62px !important;
+        margin-right: 0 !important;
+        width: calc(100% - 62px) !important;
+        max-width: calc(100% - 62px) !important;
+        padding-left: 12px !important;
+        padding-right: 14px !important;
+        box-sizing: border-box !important;
     }
 }
 @media (max-width: 600px) {
     #rg-sidebar { display: none !important; }
-    gradio-app, .gradio-container { margin-left: 0 !important; max-width: 100% !important; width: 100% !important; }
+    .gradio-container {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+        box-sizing: border-box !important;
+    }
+    .rg-floating-chat-pill {
+        right: 14px !important;
+        bottom: 14px !important;
+        padding: 8px 14px !important;
+        font-size: 12px !important;
+    }
 }
 </style>
 """
@@ -2022,9 +2172,12 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
             </button>
         </div>
     </div>
-    """)
 
-    floating_chat_btn = gr.Button("💬 Open chatbot", elem_classes=["floating-chat-btn"], size="sm")
+    <!-- Floating chat pill button (pure HTML, fixed bottom-right, zero flow disruption) -->
+    <div class="rg-floating-chat-pill" onclick="window.retinaOpenTab('AI Clinical Chatbot')" title="Open AI Clinical Assistant">
+        💬 AI Chatbot
+    </div>
+    """)
 
     # Session state
     pred_context_state = gr.State({})
@@ -2331,8 +2484,6 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                 st = 2
         return calculate_multimodal_risk(st, hba1c, duration, age, bp, d_type)
 
-    # Floating chatbot button opens the chatbot tab
-    floating_chat_btn.click(fn=None, inputs=None, outputs=None, js=open_tab_js("AI Clinical Chatbot"))
 
     # Reusable analysis outputs tuple for all analyze_fundus call sites
     analysis_outputs = [
