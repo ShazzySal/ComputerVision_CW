@@ -2392,22 +2392,6 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                     longitudinal_summary_view = gr.HTML("<div style='color:#64748b;'>Submit two images to begin.</div>")
                     longitudinal_diff_view = gr.Image(label="Registration/Difference Visualisation", type="numpy", height=240)
 
-    # Medios-Standard SaMD Regulatory Notice Card (Image 1 Inspiration)
-    gr.HTML("""
-    <div class="medios-disclaimer-card">
-        <div style="display:flex; align-items:flex-start; gap:12px;">
-            <span style="font-size:24px;">🛡️</span>
-            <div>
-                <div style="font-weight:800; font-size:12.5px; color:#2dd4bf; letter-spacing:0.5px; text-transform:uppercase;">
-                    Medios-Standard SaMD Clinical Decision Support Notice &bull; FDA 21 CFR 860 / EU AI Act Class IIa
-                </div>
-                <div style="font-size:11.5px; color:#ccfbf1; margin-top:3px; line-height:1.5;">
-                    RetinaGuard AI is an assistive physician-support system developed for diabetic eye screening augmentation. It is not an autonomous diagnostic replacement for a definitive stereoscopic slit-lamp fundus biomicroscopic examination by a certified ophthalmologist. All autonomous therapeutic guidance is withheld whenever the model confidence is intercepted below the active Governance Safety Gate threshold.
-                </div>
-            </div>
-        </div>
-    </div>
-    """)
 
 
     # ─────────────────────────────────────────────────────────────────────────
