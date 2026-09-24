@@ -2193,12 +2193,7 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                 st = 2
         return calculate_multimodal_risk(st, hba1c, duration, age, bp, d_type)
 
-    # Fixed quick-navigation controls activate the existing Gradio tabs.
-    quick_cbr.click(fn=None, inputs=None, outputs=None, js=open_tab_js("Case-Based Reasoning"))
-    quick_care.click(fn=None, inputs=None, outputs=None, js=open_tab_js("Clinical Management"))
-    quick_triage.click(fn=None, inputs=None, outputs=None, js=open_tab_js("Multimodal Triage"))
-    quick_reports.click(fn=None, inputs=None, outputs=None, js=open_tab_js("Image Comparison"))
-    quick_compare.click(fn=None, inputs=None, outputs=None, js=open_tab_js("Longitudinal Analysis"))
+    # Floating chatbot button opens the chatbot tab
     floating_chat_btn.click(fn=None, inputs=None, outputs=None, js=open_tab_js("AI Clinical Chatbot"))
 
     # Reusable analysis outputs tuple for all analyze_fundus call sites
