@@ -8,8 +8,10 @@ from core.config import AppConfig
 from core.explainability import (
     compute_gradcam,
     extract_classical_cv_biomarkers,
+    extract_retinal_vessels,
     find_similar_cases,
     generate_quadrant_description,
+    localize_optic_disc,
     overlay_heatmap,
     segment_retinal_lesions,
 )
@@ -31,11 +33,16 @@ class ExplainabilityAgent:
         heatmap = compute_gradcam(preproc_img, stage)
         quadrant_desc, quadrant_scores, peak_quadrant, peak_value = generate_quadrant_description(heatmap, stage)
         lesion_segmentation, lesion_pct = segment_retinal_lesions(preproc_img, heatmap, stage)
+        vessel_analysis = extract_retinal_vessels(preproc_img)
+        optic_disc = localize_optic_disc(preproc_img)
         return {"overlay_cam": overlay_heatmap(preproc_img, heatmap), "lesion_seg": lesion_segmentation,
                 "lesion_pct": lesion_pct, "quadrant_desc": quadrant_desc,
                 "quadrant_scores": quadrant_scores, "peak_quadrant": peak_quadrant,
                 "peak_val": peak_value, "similar_cases": find_similar_cases(preproc_img),
-                "classical_cv": extract_classical_cv_biomarkers(preproc_img)}
+            "classical_cv": extract_classical_cv_biomarkers(preproc_img),
+            "vessel_method_description": vessel_analysis.get("method_description", "Exploratory classical-CV vessel analysis."),
+            "optic_disc_method_description": optic_disc.get("method_description", "Exploratory optic-disc heuristic."),
+            **vessel_analysis, **optic_disc}
 
 
 class AdvisoryAgent:

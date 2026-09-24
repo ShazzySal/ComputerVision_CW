@@ -539,7 +539,7 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float, session_history:
     empty_img = np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3), dtype=np.uint8)
     if img is None:
         notice = "<div class='card warning-card'>⚠️ <strong>Please upload a retinal fundus photograph</strong> or click one of the quick-load sample buttons on the left.</div>"
-        return notice, "", {}, empty_img, empty_img, "", [], "", "", "", "", "", None, [], "", empty_img, "", "", 0.0, "", "", "", ""
+        return notice, "", {}, empty_img, empty_img, empty_img, empty_img, "", [], "", "", "", "", None, [], "", empty_img, "", "", 0.0, "", "", "", ""
 
     try:
         preproc = preprocess_image(img)
@@ -548,7 +548,7 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float, session_history:
             "<div class='card warning-card'>⚠️ <strong>Invalid fundus image input</strong> — "
             f"{exc}. Please upload a valid retina image or choose a sample fundus from the quick-load buttons.</div>"
         )
-        return notice, "", {}, empty_img, empty_img, "", [], "", "", "", "", "", None, [], "", empty_img, "", "", 0.0, "", "", "", ""
+        return notice, "", {}, empty_img, empty_img, empty_img, empty_img, "", [], "", "", "", "", None, [], "", empty_img, "", "", 0.0, "", "", "", ""
 
     # Image Quality Assessment (before inference)
     qc = assess_image_quality(img)
@@ -725,6 +725,21 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float, session_history:
 
     lesion_burden_html = lesion_burden_html + classical_cv_html
 
+    vessel_density = float(expl.get("vessel_density", 0.0))
+    optic_found = bool(expl.get("optic_disc_found", False))
+    optic_status = "Detected" if optic_found else "Not reliably detected"
+    classical_cv_status_html = (
+        '<div style="margin-top:10px; padding:12px 14px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">'
+        '<div style="font-size:12px; font-weight:800; color:#0369a1;">Classical CV Vessel Analysis</div>'
+        f'<div style="font-size:13px; color:#334155; margin-top:5px;">Vessel density: <strong>{vessel_density:.2f}%</strong> '
+        f'| Method: {expl.get("vessel_status", "Exploratory morphology")}</div>'
+        '<div style="font-size:12px; font-weight:800; color:#7c3aed; margin-top:10px;">Optic-Disc Localisation</div>'
+        f'<div style="font-size:13px; color:#334155; margin-top:5px;">Status: <strong>{optic_status}</strong> '
+        f'| Heuristic score: {float(expl.get("optic_disc_score", 0.0)):.2f}</div>'
+        '<div style="font-size:11px; color:#64748b; margin-top:8px; font-style:italic;">Visual support only — not an independent diagnosis.</div>'
+        '</div>'
+    )
+
     # 8. Anatomical Quadrant Salience HTML bar chart
     quad_scores = expl.get("quadrant_scores", {})
     peak_quad = expl.get("peak_quadrant", "-")
@@ -865,24 +880,27 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float, session_history:
         probs_dict,                     # 2: prob_distribution
         expl["overlay_cam"],            # 3: overlay_cam_view
         expl["lesion_seg"],             # 4: lesion_seg_view
-        expl["quadrant_desc"],          # 5: quadrant_text
-        gallery_items,                  # 6: gallery_view
-        advisory_html,                  # 7: advisory_view
-        ehr_text,                       # 8: ehr_note_box
-        lesion_burden_html,             # 9: lesion_burden_view
-        quadrant_chart_html,            # 10: quadrant_chart_view
-        confidence_margin_html,         # 11: confidence_margin_view
-        pred_context,                   # 12: pred_context_state
-        session_history,                # 13: session_history_state
-        quality_html + uncertainty_banner_html,  # 14: uncertainty_banner_top
-        processed_display,              # 15: processed_img_view
-        session_history_html,           # 16: session_history_view
-        diag["stage_name"],             # 17: _diag_stage_name_state
-        conf_val,                       # 18: _diag_conf_state
-        adv["urgency"],                 # 19: _diag_urgency_state
-        adv["followup"],                # 20: _diag_followup_state
-        adv["plan"],                    # 21: _diag_plan_state
-        quality_html,                   # 22: quality_warning_view
+        expl["vessel_overlay"],         # 5: vessel_overlay_view
+        expl["optic_disc_overlay"],     # 6: optic_disc_overlay_view
+        classical_cv_status_html,       # 7: classical_cv_status_view
+        expl["quadrant_desc"],          # 8: quadrant_text
+        gallery_items,                  # 9: gallery_view
+        advisory_html,                  # 10: advisory_view
+        ehr_text,                       # 11: ehr_note_box
+        lesion_burden_html,             # 12: lesion_burden_view
+        quadrant_chart_html,             # 13: quadrant_chart_view
+        confidence_margin_html,         # 14: confidence_margin_view
+        pred_context,                   # 15: pred_context_state
+        session_history,                # 16: session_history_state
+        quality_html + uncertainty_banner_html,  # 17: uncertainty_banner_top
+        processed_display,              # 18: processed_img_view
+        session_history_html,           # 19: session_history_view
+        diag["stage_name"],             # 20: _diag_stage_name_state
+        conf_val,                       # 21: _diag_conf_state
+        adv["urgency"],                 # 22: _diag_urgency_state
+        adv["followup"],                # 23: _diag_followup_state
+        adv["plan"],                    # 24: _diag_plan_state
+        quality_html,                   # 25: quality_warning_view
     )
 
 
@@ -1325,6 +1343,17 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                         with gr.Column(scale=5):
                             gr.Markdown("**Layer 3: Lesion Segmentation (U-Net)**")
                             lesion_seg_view = gr.Image(label="Segmented Lesions (Fluorescent Green)", type="numpy", height=240)
+                    gr.Markdown("### Classical CV Visual Support")
+                    with gr.Row():
+                        with gr.Column(scale=5):
+                            gr.Markdown("**Classical CV Vessel Analysis**")
+                            vessel_overlay_view = gr.Image(label="Retinal Vessel Overlay", type="numpy", height=220)
+                        with gr.Column(scale=5):
+                            gr.Markdown("**Optic-Disc Localisation**")
+                            optic_disc_overlay_view = gr.Image(label="Optic-Disc Localisation Overlay", type="numpy", height=220)
+                    classical_cv_status_view = gr.HTML(
+                        "<div style='color:#64748b; font-size:12px;'>Visual support only — not an independent diagnosis.</div>"
+                    )
 
                     lesion_burden_view = gr.HTML()
                     quadrant_text = gr.Markdown()
@@ -1449,6 +1478,9 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
         prob_distribution,
         overlay_cam_view,
         lesion_seg_view,
+        vessel_overlay_view,
+        optic_disc_overlay_view,
+        classical_cv_status_view,
         quadrant_text,
         gallery_view,
         advisory_view,
@@ -1538,6 +1570,9 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
             {},
             empty_img,
             empty_img,
+            empty_img,
+            empty_img,
+            "<div style='color:#64748b; font-size:12px;'>Visual support only — not an independent diagnosis.</div>",
             "",
             [],
             "",
@@ -1572,6 +1607,9 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
             prob_distribution,
             overlay_cam_view,
             lesion_seg_view,
+            vessel_overlay_view,
+            optic_disc_overlay_view,
+            classical_cv_status_view,
             quadrant_text,
             gallery_view,
             advisory_view,

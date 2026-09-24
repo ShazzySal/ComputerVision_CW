@@ -88,3 +88,104 @@ def extract_classical_cv_biomarkers(preproc_img: np.ndarray) -> Dict[str, Any]:
     return {"sobel_edge_density": float(np.mean(grad_mag > np.percentile(grad_mag, 85)) * 100.0),
             "morph_candidate_pct": float(np.mean(tophat > 25) * 100.0),
             "mean_gradient": float(np.mean(grad_mag)), "clahe_status": "Calibrated (Clip=2.0)"}
+
+
+def extract_retinal_vessels(preproc_img: np.ndarray) -> Dict[str, Any]:
+    """Create an exploratory vessel mask from green-channel morphology."""
+    base = (np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8)
+    green = base[:, :, 1]
+    enhanced = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(green)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+    vessel_response = cv2.morphologyEx(enhanced, cv2.MORPH_BLACKHAT, kernel)
+    _, mask = cv2.threshold(vessel_response, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    cleanup_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, cleanup_kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, cleanup_kernel)
+    overlay = base.copy()
+    overlay[mask > 0] = [40, 220, 255]
+    return {
+        "vessel_mask": mask,
+        "vessel_overlay": cv2.addWeighted(base, 0.65, overlay, 0.35, 0),
+        "vessel_density": float(np.mean(mask > 0) * 100.0),
+        "vessel_status": "Green-channel black-hat + Otsu morphology",
+        "method_description": "Exploratory green-channel CLAHE, black-hat morphology, Otsu thresholding, and morphological cleanup; visual support only.",
+    }
+
+
+def localize_optic_disc(preproc_img: np.ndarray) -> Dict[str, Any]:
+    """Locate a bright optic-disc candidate for visualisation only."""
+    base = (np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8)
+    green = base[:, :, 1]
+    smooth = cv2.GaussianBlur(green, (15, 15), 0)
+    threshold = max(170, int(np.percentile(smooth, 99.0)) - 1)
+    _, candidates = cv2.threshold(smooth, threshold, 255, cv2.THRESH_BINARY)
+    candidates = cv2.morphologyEx(candidates, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    contours, _ = cv2.findContours(candidates, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    image_area = float(green.shape[0] * green.shape[1])
+    valid = []
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if not 0.002 * image_area <= area <= 0.20 * image_area:
+            continue
+        x, y, w, h = cv2.boundingRect(contour)
+        aspect = min(w, h) / max(w, h, 1)
+        circularity = 4 * np.pi * area / max(cv2.arcLength(contour, True) ** 2, 1.0)
+        if aspect >= 0.35 and circularity >= 0.20:
+            valid.append(contour)
+
+    empty = {
+        "optic_disc_found": False,
+        "optic_disc_center": None,
+        "optic_disc_radius": None,
+        "optic_disc_box": None,
+        "optic_disc_mask": np.zeros(green.shape, dtype=np.uint8),
+        "optic_disc_overlay": base,
+        "optic_disc_score": 0.0,
+        "method_description": "Bright-region thresholding with contour size, shape, and position validation; no reliable candidate found.",
+        "optic_disc_method_description": "Bright-region thresholding with contour size, shape, and position validation; no reliable candidate found.",
+    }
+    if not valid:
+        return empty
+
+    height, width = green.shape
+    def candidate_score(candidate: np.ndarray) -> float:
+        x, y, w, h = cv2.boundingRect(candidate)
+        area = cv2.contourArea(candidate)
+        circularity = 4 * np.pi * area / max(cv2.arcLength(candidate, True) ** 2, 1.0)
+        center_x = (x + w / 2) / width
+        position_score = 1.0 - min(abs(center_x - 0.30) / 0.70, 1.0)
+        return float(min(area / image_area * 8.0, 1.0) * min(circularity, 1.0) * position_score)
+
+    contour = max(valid, key=candidate_score)
+    area = cv2.contourArea(contour)
+    moments = cv2.moments(contour)
+    if moments["m00"] == 0:
+        return empty
+    center = (int(moments["m10"] / moments["m00"]), int(moments["m01"] / moments["m00"]))
+    x, y, w, h = cv2.boundingRect(contour)
+    circularity = float(4 * np.pi * area / max(cv2.arcLength(contour, True) ** 2, 1.0))
+    score = candidate_score(contour)
+    if score < 0.02:
+        return empty
+    radius = int(round(max(w, h) / 2.0))
+    disc_mask = np.zeros(green.shape, dtype=np.uint8)
+    cv2.drawContours(disc_mask, [contour], -1, 255, -1)
+    overlay = base.copy()
+    cv2.drawContours(overlay, [contour], -1, (0, 255, 0), 2)
+    cv2.circle(overlay, center, 4, (255, 0, 255), -1)
+    return {"optic_disc_found": True, "optic_disc_overlay": overlay, "optic_disc_center": center,
+            "optic_disc_radius": radius, "optic_disc_box": (x, y, w, h), "optic_disc_mask": disc_mask,
+            "optic_disc_score": score,
+            "method_description": "Bright green-channel candidate selected with contour size, elliptical-shape, and nasal-position heuristics; visual support only.",
+            "optic_disc_method_description": "Bright green-channel candidate selected with contour size, elliptical-shape, and nasal-position heuristics; visual support only."}
+
+
+def remove_optic_disc(preproc_img: np.ndarray, optic_disc: Dict[str, Any]) -> np.ndarray:
+    """Return a visual comparison with the detected disc inpainted, never a classifier input."""
+    base = (np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8)
+    if not AppConfig.ENABLE_OPTIC_DISC_REMOVAL or not optic_disc.get("optic_disc_found"):
+        return base
+    mask = optic_disc.get("optic_disc_mask")
+    if mask is None or not np.any(mask):
+        return base
+    return cv2.inpaint(base, mask, 3, cv2.INPAINT_TELEA)

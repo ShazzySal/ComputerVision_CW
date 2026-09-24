@@ -17,6 +17,7 @@ class AppConfig:
     BEN_GRAHAM_BETA: float = -4.0
     BEN_GRAHAM_GAMMA: float = 128.0
     DEFAULT_CONFIDENCE_THRESHOLD: float = 0.70
+    ENABLE_OPTIC_DISC_REMOVAL: bool = False
 
     WEIGHTS_PATH: str = str(PROJECT_ROOT / "checkpoints" / "best_phase2.weights.h5")
     UNET_WEIGHTS_PATH: str = str(PROJECT_ROOT / "checkpoints" / "unet_lesion_best.weights.h5")
