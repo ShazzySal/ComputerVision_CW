@@ -358,35 +358,111 @@ def calculate_multimodal_risk(stage: int = 2, hba1c: float = 7.5, duration_years
     else:
         risk_label, risk_color = "CRITICAL VISION-THREATENING RISK", "#e11d48"
 
+    # RetinaRisk-inspired SVG Speedometer Gauge
+    clamped_risk = min(max(risk_pct, 1.0), 99.0)
+    arc_length = 267.0
+    dash_offset = arc_length * (1.0 - (clamped_risk / 100.0))
+
+    # Calculate screening ladder steps (highlight the recommended tier)
+    tiers = [
+        ("12 Mo", "P4 Surveillance", "#10b981", stage == 0),
+        ("6–9 Mo", "P3 Primary Care", "#0284c7", stage == 1),
+        ("3–6 Mo", "P2 Hospital OCT", "#d97706", stage == 2),
+        ("2–4 Wk", "P2+ Vitreoretinal", "#ea580c", stage == 3),
+        ("≤ 48 Hr", "P1 Emergency", "#e11d48", stage == 4),
+    ]
+
+    ladder_html = ""
+    for interval, tier_name, tcolor, is_active in tiers:
+        if is_active:
+            ladder_html += f"""
+            <div style="flex:1; background:{tcolor}; color:#fff; border-radius:8px; padding:8px 4px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.15); border:2px solid #fff;">
+                <div style="font-size:13px; font-weight:800;">{interval}</div>
+                <div style="font-size:9.5px; font-weight:700; text-transform:uppercase; margin-top:2px; opacity:0.95;">{tier_name}</div>
+                <div style="font-size:9px; background:rgba(255,255,255,0.25); border-radius:4px; padding:1px 3px; margin-top:3px; font-weight:800;">RECOMMENDED</div>
+            </div>
+            """
+        else:
+            ladder_html += f"""
+            <div style="flex:1; background:#f1f5f9; color:#64748b; border-radius:8px; padding:8px 4px; text-align:center; border:1px solid #e2e8f0; opacity:0.75;">
+                <div style="font-size:12px; font-weight:700;">{interval}</div>
+                <div style="font-size:9px; margin-top:2px;">{tier_name}</div>
+            </div>
+            """
+
     risk_card_html = f"""
-    <div style="padding:16px; background:#f8fafc; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:12px;">
+    <div style="padding:16px; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0; margin-bottom:12px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">
             <div style="font-size:13px; font-weight:800; text-transform:uppercase; color:#0369a1; display:flex; align-items:center; gap:8px;">
-                <span>🚦</span> Multimodal Clinical Triage & 10-Year Progression Predictor (UKPDS / WESDR Model)
+                <span>⏱️</span> RetinaRisk™ Individualized Screening & 10-Year Progression Predictor
             </div>
-            <span style="background:{color}; color:#fff; font-size:11.5px; font-weight:800; padding:4px 10px; border-radius:4px; letter-spacing:0.5px;">
+            <span style="background:{color}; color:#fff; font-size:11.5px; font-weight:800; padding:4px 10px; border-radius:6px; letter-spacing:0.5px;">
                 {triage_code.split('—')[0].strip()}
             </span>
         </div>
         <div class="responsive-grid responsive-grid-two" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:12px;">
-            <div style="background:#fff; border-radius:8px; padding:14px; border:1px solid #e2e8f0; border-left:4px solid {risk_color};">
-                <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">10-Year Vision Loss / Progression Risk</div>
-                <div style="display:flex; align-items:baseline; gap:8px; margin:6px 0;">
-                    <span style="font-size:36px; font-weight:800; color:{risk_color};">{risk_pct:.1f}%</span>
-                    <span style="font-size:12.5px; color:{risk_color}; font-weight:700;">{risk_label}</span>
+            <!-- Speedometer Gauge Card -->
+            <div style="background:#fff; border-radius:10px; padding:16px; border:1px solid #e2e8f0; border-top:4px solid {risk_color}; text-align:center;">
+                <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Sight-Threatening Retinopathy Risk</div>
+                <div style="margin:8px auto; max-width:240px;">
+                    <svg viewBox="0 0 240 135" style="width:100%; height:auto; overflow:visible;">
+                        <defs>
+                            <linearGradient id="retinaRiskGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#10b981" />
+                                <stop offset="30%" stop-color="#0284c7" />
+                                <stop offset="65%" stop-color="#f59e0b" />
+                                <stop offset="100%" stop-color="#ef4444" />
+                            </linearGradient>
+                        </defs>
+                        <!-- Background track -->
+                        <path d="M 30 115 A 85 85 0 0 1 210 115" fill="none" stroke="#f1f5f9" stroke-width="14" stroke-linecap="round" />
+                        <!-- Active Progress Arc -->
+                        <path d="M 30 115 A 85 85 0 0 1 210 115" fill="none" stroke="url(#retinaRiskGrad)" stroke-width="14" stroke-linecap="round"
+                              stroke-dasharray="267" stroke-dashoffset="{dash_offset:.1f}" />
+                        <!-- Gauge Center Text -->
+                        <text x="120" y="86" text-anchor="middle" font-size="30" font-weight="900" fill="{risk_color}">{risk_pct:.1f}%</text>
+                        <text x="120" y="104" text-anchor="middle" font-size="10" font-weight="800" fill="#64748b" letter-spacing="0.5">IN 10 YEARS</text>
+                        <text x="30" y="130" font-size="9.5" font-weight="700" fill="#10b981">0% (Low)</text>
+                        <text x="120" y="130" text-anchor="middle" font-size="9.5" font-weight="700" fill="#f59e0b">Moderate</text>
+                        <text x="210" y="130" text-anchor="end" font-size="9.5" font-weight="700" fill="#ef4444">100% (High)</text>
+                    </svg>
                 </div>
-                <div style="background:#e2e8f0; border-radius:4px; height:9px; overflow:hidden;">
-                    <div style="background:{risk_color}; width:{min(risk_pct, 100):.1f}%; height:100%; border-radius:4px;"></div>
-                </div>
-                <div style="font-size:11px; color:#64748b; margin-top:8px; line-height:1.4;">
-                    <strong>Multimodal Inputs:</strong> Stage {stage} ({AppConfig.CLASS_NAMES[stage]}) + HbA1c ({hba1c:.1f}%) + Duration ({duration_years:.0f}y) + BP ({systolic_bp:.0f} mmHg).
+                <div style="font-size:13px; font-weight:800; color:{risk_color}; margin-top:2px;">{risk_label}</div>
+                <div style="font-size:11px; color:#64748b; margin-top:4px;">
+                    UKPDS 33 / WESDR Multiplicative Systemic Model
                 </div>
             </div>
-            <div style="background:#fff; border-radius:8px; padding:14px; border:1px solid #e2e8f0; border-left:4px solid {color};">
-                <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase;">Hospital Dispatch & Triage Routing</div>
-                <div style="font-size:15px; font-weight:800; color:#1e293b; margin-top:4px;">{facility}</div>
-                <div style="font-size:13px; color:{color}; font-weight:800; margin:4px 0;">Target Referral Wait Time: {wait_time}</div>
-                <div style="font-size:12px; color:#475569; line-height:1.45;"><strong>Protocol:</strong> {protocol}</div>
+
+            <!-- Hospital Dispatch Routing Card -->
+            <div style="background:#fff; border-radius:10px; padding:16px; border:1px solid #e2e8f0; border-top:4px solid {color}; display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                    <div style="font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Hospital Dispatch & Routing</div>
+                    <div style="font-size:16px; font-weight:800; color:#0f172a; margin-top:4px;">{facility}</div>
+                    <div style="display:inline-flex; align-items:center; gap:6px; background:#eff6ff; color:{color}; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:800; margin:6px 0;">
+                        <span>⏱️</span> Mandatory Wait Time: {wait_time}
+                    </div>
+                    <div style="font-size:12px; color:#334155; line-height:1.5; margin-top:6px;">
+                        <strong>Clinical Action Plan:</strong> {protocol}
+                    </div>
+                </div>
+                <div style="font-size:11px; color:#64748b; background:#f8fafc; border-radius:6px; padding:8px 10px; margin-top:8px;">
+                    <strong>Patient Profile:</strong> Age {age:.0f}y &bull; {diabetes_type} &bull; HbA1c {hba1c:.1f}% &bull; Duration {duration_years:.0f}y &bull; BP {systolic_bp:.0f} mmHg
+                </div>
+            </div>
+        </div>
+
+        <!-- RetinaRisk Individualized Screening Ladder -->
+        <div style="background:#fff; border-radius:10px; padding:14px; border:1px solid #e2e8f0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <div style="font-size:11.5px; font-weight:700; text-transform:uppercase; color:#0369a1;">
+                    Individualized Screening Prescription vs. Standard Annual Surveillance
+                </div>
+                <div style="font-size:11px; color:#64748b;">
+                    Standard Recall: <strong style="color:#0f172a;">12 Months</strong> &bull; Personalized: <strong style="color:{color};">{wait_time}</strong>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+                {ladder_html}
             </div>
         </div>
     </div>
@@ -596,21 +672,38 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float, session_history:
         </div>
         """
 
-    # 2. Hero Diagnosis Card HTML
+    # 2. Hero Diagnosis Card HTML (Medios-Style Tri-State Status Chip & Hospital Card)
     border_c, bg_c, badge_text = STAGE_BADGE_COLORS[stage]
+
+    if stage == 0:
+        medios_chip_text = "🟢 NO DR DETECTED"
+        medios_chip_bg = "#ecfdf5"
+        medios_chip_color = "#065f46"
+        medios_chip_border = "#a7f3d0"
+    elif stage in (1, 2):
+        medios_chip_text = f"🟡 DIABETIC RETINOPATHY DETECTED ({diag['stage_name'].upper()})"
+        medios_chip_bg = "#fffbeb"
+        medios_chip_color = "#92400e"
+        medios_chip_border = "#fde68a"
+    else:
+        medios_chip_text = f"🔴 SIGHT-THREATENING RETINOPATHY DETECTED ({diag['stage_name'].upper()})"
+        medios_chip_bg = "#fff1f2"
+        medios_chip_color = "#9f1239"
+        medios_chip_border = "#fecdd3"
+
     hero_html = f"""
     <div class="card hero-card" style="border-top: 5px solid {border_c};">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
             <div>
-                <span class="stage-badge stage-badge-{stage}" style="background:{bg_c}; color:{border_c}; padding:4px 10px; border-radius:20px; font-weight:700; font-size:12px; letter-spacing:0.5px;">
-                    {badge_text}
-                </span>
-                <h1 class="hero-stage-title" style="margin:8px 0 4px 0; font-size:26px;">{diag['stage_name']}</h1>
-                <p class="hero-subtext" style="margin:0; font-size:13px;">ICDR Severity Scale • Primary Diagnostic Output</p>
+                <div style="display:inline-flex; align-items:center; gap:6px; background:{medios_chip_bg}; color:{medios_chip_color}; border:1px solid {medios_chip_border}; padding:5px 14px; border-radius:20px; font-weight:800; font-size:12px; letter-spacing:0.5px; margin-bottom:8px;">
+                    {medios_chip_text}
+                </div>
+                <h1 class="hero-stage-title" style="margin:2px 0 4px 0; font-size:26px;">Stage {stage}: {diag['stage_name']}</h1>
+                <p class="hero-subtext" style="margin:0; font-size:13px;">International Clinical Diabetic Retinopathy (ICDR) Scale &bull; Primary Diagnostic Output</p>
             </div>
             <div style="text-align:right;">
-                <div style="font-size:32px; font-weight:800; color:{border_c};">{diag['confidence']*100:.1f}%</div>
-                <div class="hero-sublabel" style="font-size:12px; font-weight:600;">CONFIDENCE SCORE</div>
+                <div style="font-size:36px; font-weight:900; color:{border_c}; line-height:1;">{diag['confidence']*100:.1f}%</div>
+                <div class="hero-sublabel" style="font-size:11px; font-weight:700; margin-top:4px; letter-spacing:0.5px;">DIAGNOSTIC CONFIDENCE</div>
             </div>
         </div>
     </div>
@@ -1189,6 +1282,115 @@ CUSTOM_CSS = """
         grid-template-columns: 1fr !important;
     }
 }
+
+/* Stepper Component (Medios / Mobile Workflow) */
+.stepper-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #042f2e;
+    border: 1px solid #115e59;
+    border-radius: 10px;
+    padding: 10px 18px;
+    margin-bottom: 16px;
+    color: #f0fdfa;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.dark .stepper-container {
+    background: #022c22;
+    border-color: #134e4a;
+}
+.stepper-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.stepper-circle {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #0d9488;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+}
+.stepper-title {
+    font-size: 11.5px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #ccfbf1;
+}
+.stepper-sub {
+    font-size: 10px;
+    color: #99f6e4;
+    opacity: 0.85;
+}
+.stepper-arrow {
+    color: #2dd4bf;
+    font-weight: 800;
+    font-size: 14px;
+}
+
+/* Medios Patient EHR Card */
+.patient-id-card {
+    background: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+}
+.dark .patient-id-card {
+    background: #0f172a;
+    border-color: #334155;
+}
+.badge-quota {
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+}
+.dark .badge-quota {
+    background: #064e3b;
+    color: #a7f3d0;
+    border-color: #059669;
+}
+.patient-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f1f5f9;
+    color: #334155;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
+.dark .patient-chip {
+    background: #1e293b;
+    color: #cbd5e1;
+}
+
+/* Medios SaMD Regulatory Card */
+.medios-disclaimer-card {
+    background: #042f2e;
+    border: 1px solid #115e59;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-top: 14px;
+    color: #ccfbf1;
+}
+.dark .medios-disclaimer-card {
+    background: #022c22;
+    border-color: #134e4a;
+}
 </style>
 """
 
@@ -1281,10 +1483,53 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
     </div>
     """)
 
+    # Clinical Workflow Stepper Bar (Medios / Mobile Screening Workflow)
+    gr.HTML("""
+    <div class="stepper-container">
+        <div class="stepper-item">
+            <span class="stepper-circle">01</span>
+            <div><div class="stepper-title">CLINICAL INTAKE</div><div class="stepper-sub">Patient Profile &amp; HbA1c</div></div>
+        </div>
+        <div class="stepper-arrow">➔</div>
+        <div class="stepper-item">
+            <span class="stepper-circle">02</span>
+            <div><div class="stepper-title">IMAGE ACQUISITION</div><div class="stepper-sub">Optical Quality Check</div></div>
+        </div>
+        <div class="stepper-arrow">➔</div>
+        <div class="stepper-item">
+            <span class="stepper-circle">03</span>
+            <div><div class="stepper-title">AI SAFETY GATE</div><div class="stepper-sub">70% Threshold &amp; Override</div></div>
+        </div>
+        <div class="stepper-arrow">➔</div>
+        <div class="stepper-item">
+            <span class="stepper-circle">04</span>
+            <div><div class="stepper-title">CLINICAL DOSSIER</div><div class="stepper-sub">Triage, Grad-CAM &amp; 10-Yr Risk</div></div>
+        </div>
+    </div>
+    """)
+
     # 2. Main Workspace (2 Columns)
     with gr.Row():
         # Left Column: Upload & Governance Configuration
         with gr.Column(scale=4):
+            gr.HTML("""
+            <div class="patient-id-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:8px; margin-bottom:8px;">
+                    <div>
+                        <div style="font-size:10px; color:#64748b; font-weight:800; text-transform:uppercase;">EHR Active Screening Record</div>
+                        <div style="font-size:15px; font-weight:800; color:#0f172a;">MRN: RG-2026-9812 &bull; Test Patient</div>
+                    </div>
+                    <span class="badge-quota">⚡ 99 SCANS LEFT</span>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <span class="patient-chip">👤 Age: 55y</span>
+                    <span class="patient-chip">🩺 Type 2 DM</span>
+                    <span class="patient-chip">⏳ 10 Years</span>
+                    <span class="patient-chip">🩸 HbA1c: 7.5%</span>
+                    <span class="patient-chip">💓 BP: 135 mmHg</span>
+                </div>
+            </div>
+            """)
             gr.Markdown("### 📥 Retinal Photography Input")
             input_image = gr.Image(label="Upload Fundus Photo", type="numpy", height=280)
 
@@ -1455,6 +1700,23 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                     gr.Markdown("Downloads a structured JSON file containing the diagnosis, confidence, probabilities, advisory, and EHR note.")
                     download_btn = gr.Button("⬇️ Generate & Download Report (JSON)", variant="primary")
                     download_file = gr.File(label="Download", visible=False)
+
+    # Medios-Standard SaMD Regulatory Notice Card (Image 1 Inspiration)
+    gr.HTML("""
+    <div class="medios-disclaimer-card">
+        <div style="display:flex; align-items:flex-start; gap:12px;">
+            <span style="font-size:24px;">🛡️</span>
+            <div>
+                <div style="font-weight:800; font-size:12.5px; color:#2dd4bf; letter-spacing:0.5px; text-transform:uppercase;">
+                    Medios-Standard SaMD Clinical Decision Support Notice &bull; FDA 21 CFR 860 / EU AI Act Class IIa
+                </div>
+                <div style="font-size:11.5px; color:#ccfbf1; margin-top:3px; line-height:1.5;">
+                    RetinaGuard AI is an assistive physician-support system developed for diabetic eye screening augmentation. It is not an autonomous diagnostic replacement for a definitive stereoscopic slit-lamp fundus biomicroscopic examination by a certified ophthalmologist. All autonomous therapeutic guidance is withheld whenever the model confidence is intercepted below the active Governance Safety Gate threshold.
+                </div>
+            </div>
+        </div>
+    </div>
+    """)
 
 
     # ─────────────────────────────────────────────────────────────────────────
