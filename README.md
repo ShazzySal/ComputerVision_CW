@@ -63,7 +63,9 @@ Computer-Vision-CW/
 │   ├── preprocessing.py                   # Fundus cropping, resizing, and Ben Graham enhancement
 │   ├── models.py                          # EfficientNetB3, U-Net, Grad-CAM, and embeddings
 │   ├── explainability.py                  # Grad-CAM, retrieval, segmentation, and classical CV
-│   └── agents.py                          # Diagnosis, advisory, explainability, and governance
+│   ├── advanced_cv.py                      # Research overlap, biomarkers, consistency, and longitudinal analysis
+│   ├── research_evidence.py                # Ablation, ordinal error analysis, and reproducibility artifacts
+│   └── agents.py                           # Diagnosis, advisory, explainability, and governance
 ├── requirements.txt                      # Complete pinned Python environment dependencies
 ├── README.md                             # Comprehensive technical documentation & reproduction guide
 ├── checkpoints/                          # Saved model weight checkpoints
@@ -80,6 +82,12 @@ Computer-Vision-CW/
     ├── gradcam_multiclass_overlays.png   # 5-stage Grad-CAM overlays & quadrant analysis
     └── similar_cases_demo.png            # Query image vs top-3 retrieved historical cases
 ```
+
+  Research evidence utilities are documented in `research_evidence.md`. They run
+  outside the deployed application and never overwrite the production
+  `checkpoints/best_phase2.weights.h5` checkpoint. The ablation suite must be run
+  in the GPU notebook environment because the local workspace does not contain
+  the full training dataset or an executed notebook kernel.
 
 ---
 

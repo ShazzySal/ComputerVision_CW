@@ -1,0 +1,6 @@
+experiment,accuracy,macro_f1,qwk
+full_system,,,
+without_augmentation,,,
+without_class_weights,,,
+without_ben_graham,,,
+frozen_efficientnet,,,

@@ -8,7 +8,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.applications import EfficientNetB3
 
-from core.config import AppConfig
+from core.config import AppConfig, PROJECT_ROOT
 
 
 def build_classifier():
@@ -79,22 +79,29 @@ def build_auxiliary_unet():
 
 
 def load_reference_embeddings():
-    """Load only a verified reference embedding library."""
+    """Load a structurally valid embedding library, even if gallery images are unavailable."""
     if os.path.exists(AppConfig.EMBEDDINGS_PATH):
         try:
             data = np.load(AppConfig.EMBEDDINGS_PATH, allow_pickle=True)
             embeddings = np.asarray(data["embeddings"], dtype=np.float32)
             labels = np.asarray(data["labels"])
-            filepaths = [str(path) for path in data["filepaths"]]
+            filepaths = []
+            for path in data["filepaths"]:
+                path = str(path)
+                candidate = path if os.path.isabs(path) else os.path.join(str(PROJECT_ROOT), path)
+                filepaths.append(candidate)
             if embeddings.ndim != 2 or embeddings.shape[1] != 256:
                 raise ValueError("reference embeddings must have shape (n, 256)")
             if len(embeddings) != len(labels) or len(labels) != len(filepaths):
                 raise ValueError("reference arrays must have equal lengths")
-            if not all(os.path.exists(path) for path in filepaths):
-                raise FileNotFoundError("one or more reference case images are missing")
+            if not len(embeddings):
+                raise ValueError("reference embedding library is empty")
+            missing = sum(not os.path.exists(path) for path in filepaths)
+            if missing:
+                print(f"[CBR WARNING] {missing}/{len(filepaths)} reference images are unavailable; similarity metadata remains usable.")
             return embeddings, labels, filepaths
-        except Exception:
-            print("[CBR WARNING] Reference embeddings are unavailable or invalid; similar-case retrieval is disabled.")
+        except Exception as exc:
+            print(f"[CBR WARNING] Reference embeddings are unavailable or invalid; similar-case retrieval is disabled ({exc}).")
     return np.empty((0, 256), dtype=np.float32), np.empty((0,), dtype=np.int64), []
 
 

@@ -1,6 +1,6 @@
 """Explainability, retrieval, and classical computer-vision utilities."""
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -35,16 +35,24 @@ def overlay_heatmap(rgb_img: np.ndarray, heatmap: np.ndarray, alpha: float = 0.4
 
 
 def segment_retinal_lesions(preproc_img: np.ndarray, heatmap: np.ndarray, stage: int) -> Tuple[np.ndarray, float]:
+    overlay, lesion_ratio, _ = segment_retinal_lesions_with_mask(preproc_img, heatmap, stage)
+    return overlay, lesion_ratio
+
+
+def segment_retinal_lesions_with_mask(
+    preproc_img: np.ndarray, heatmap: np.ndarray, stage: int
+) -> Tuple[np.ndarray, float, Optional[np.ndarray]]:
+    """Return the existing lesion visualisation plus its raw U-Net mask."""
     base = (np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8)
     if stage == 0:
-        return base, 0.0
+        return base, 0.0, None
     raw_mask = unet_model(preproc_img[np.newaxis, ...], training=False).numpy()[0, :, :, 0]
     gated = (raw_mask > 0.35) & (cv2.resize(heatmap, (AppConfig.IMG_SIZE, AppConfig.IMG_SIZE)) > 0.30)
     visible_pixels = np.sum(np.mean(base, axis=2) > 10)
     lesion_ratio = float(np.sum(gated) / max(visible_pixels, 1) * 100.0)
     overlay = base.copy()
     overlay[gated] = [0, 255, 80]
-    return cv2.addWeighted(overlay, 0.70, base, 0.30, 0), lesion_ratio
+    return cv2.addWeighted(overlay, 0.70, base, 0.30, 0), lesion_ratio, raw_mask
 
 
 def generate_quadrant_description(heatmap: np.ndarray, stage: int) -> Tuple[str, Dict[str, float], str, float]:
