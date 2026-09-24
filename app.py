@@ -1565,162 +1565,239 @@ CUSTOM_CSS = """
     border-color: #134e4a;
 }
 
-/* ── Left Sidebar Navigation ─────────────────────────────────────── */
+/* ── Left Sidebar Navigation (ProvoHeal Inspired) ─────────────────── */
 #rg-sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    height: 100vh;
-    width: 220px;
-    background: #0d1b2e;
-    border-right: 1px solid #1e3a5f;
-    z-index: 1200;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    box-shadow: 4px 0 24px rgba(0,0,0,0.35);
-    transition: width 0.25s ease;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    height: 100vh !important;
+    width: 240px !important;
+    background: #0b1329 !important;
+    border-right: 1px solid #1e293b !important;
+    z-index: 99999 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.45) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    transition: width 0.25s ease !important;
+}
+#rg-sidebar * {
+    box-sizing: border-box !important;
 }
 #rg-sidebar .rg-sb-logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 20px 18px 16px;
-    border-bottom: 1px solid #1e3a5f;
-    flex-shrink: 0;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 20px 18px 16px !important;
+    border-bottom: 1px solid #1e293b !important;
+    flex-shrink: 0 !important;
 }
 #rg-sidebar .rg-sb-logo-icon {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, #0d9488, #0284c7);
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 20px; flex-shrink: 0;
+    width: 38px !important;
+    height: 38px !important;
+    background: linear-gradient(135deg, #0d9488, #0284c7) !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 20px !important;
+    flex-shrink: 0 !important;
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3) !important;
 }
 #rg-sidebar .rg-sb-logo-text {
-    font-size: 13px; font-weight: 800; color: #f0fdfa;
-    line-height: 1.2; letter-spacing: -0.2px;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    color: #f8fafc !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.2px !important;
 }
 #rg-sidebar .rg-sb-logo-sub {
-    font-size: 10px; color: #5eead4; font-weight: 500;
-    letter-spacing: 0.3px;
+    font-size: 10.5px !important;
+    color: #38bdf8 !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.3px !important;
+}
+#rg-sidebar .rg-sb-search-wrap {
+    padding: 12px 14px 6px !important;
+    flex-shrink: 0 !important;
+}
+#rg-sidebar .rg-sb-search {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    background: #131f38 !important;
+    border: 1px solid #223554 !important;
+    border-radius: 8px !important;
+    padding: 7px 10px !important;
+    color: #94a3b8 !important;
+}
+#rg-sidebar .rg-sb-search input {
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    color: #f1f5f9 !important;
+    font-size: 11.5px !important;
+    width: 100% !important;
+}
+#rg-sidebar .rg-sb-search input::placeholder {
+    color: #64748b !important;
+}
+#rg-sidebar .rg-kbd {
+    background: #1e293b !important;
+    border: 1px solid #334155 !important;
+    color: #94a3b8 !important;
+    border-radius: 4px !important;
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    padding: 1px 5px !important;
+    flex-shrink: 0 !important;
 }
 #rg-sidebar .rg-sb-section-label {
-    font-size: 9.5px; font-weight: 800; color: #4a6fa5;
-    letter-spacing: 1.2px; text-transform: uppercase;
-    padding: 14px 18px 6px; flex-shrink: 0;
+    font-size: 9.5px !important;
+    font-weight: 800 !important;
+    color: #475569 !important;
+    letter-spacing: 1.2px !important;
+    text-transform: uppercase !important;
+    padding: 12px 18px 6px !important;
+    flex-shrink: 0 !important;
 }
 #rg-sidebar .rg-sb-nav {
-    display: flex; flex-direction: column;
-    gap: 2px; padding: 0 10px; flex: 1; overflow-y: auto;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+    padding: 0 10px !important;
+    flex: 1 !important;
+    overflow-y: auto !important;
 }
 #rg-sidebar .rg-sb-nav::-webkit-scrollbar { width: 3px; }
 #rg-sidebar .rg-sb-nav::-webkit-scrollbar-thumb {
-    background: #1e3a5f; border-radius: 3px;
+    background: #1e293b; border-radius: 3px;
 }
 #rg-sidebar .rg-sb-nav button {
     display: flex !important;
     align-items: center !important;
     gap: 10px !important;
     width: 100% !important;
-    padding: 10px 12px !important;
+    padding: 9px 12px !important;
     border: none !important;
     background: transparent !important;
     color: #94a3b8 !important;
     border-radius: 8px !important;
-    font-size: 13px !important;
+    font-size: 12.5px !important;
     font-weight: 600 !important;
     cursor: pointer !important;
     text-align: left !important;
     transition: all 0.15s ease !important;
     letter-spacing: 0.1px !important;
+    position: relative !important;
 }
 #rg-sidebar .rg-sb-nav button:hover {
-    background: rgba(13, 148, 136, 0.15) !important;
-    color: #2dd4bf !important;
+    background: #162444 !important;
+    color: #38bdf8 !important;
 }
 #rg-sidebar .rg-sb-nav button.rg-active {
-    background: rgba(13, 148, 136, 0.22) !important;
+    background: #132742 !important;
     color: #2dd4bf !important;
     border-left: 3px solid #0d9488 !important;
+    font-weight: 700 !important;
 }
 #rg-sidebar .rg-sb-nav .rg-sb-icon {
-    font-size: 16px; flex-shrink: 0; width: 20px;
-    display: flex; align-items: center; justify-content: center;
+    font-size: 15px !important;
+    flex-shrink: 0 !important;
+    width: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+#rg-sidebar .rg-badge {
+    margin-left: auto !important;
+    background: #0369a1 !important;
+    color: #e0f2fe !important;
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    padding: 2px 6px !important;
+    border-radius: 10px !important;
+}
+#rg-sidebar .rg-sb-telemetry {
+    padding: 10px 14px !important;
+    margin: 8px 10px !important;
+    background: #0f1c34 !important;
+    border: 1px solid #1e2e4f !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+}
+#rg-sidebar .rg-status-dot {
+    width: 7px !important;
+    height: 7px !important;
+    border-radius: 50% !important;
+    background: #10b981 !important;
+    box-shadow: 0 0 8px #10b981 !important;
+    display: inline-block !important;
 }
 #rg-sidebar .rg-sb-footer {
-    padding: 12px 14px;
-    border-top: 1px solid #1e3a5f;
-    flex-shrink: 0;
+    padding: 10px 12px 14px !important;
+    border-top: 1px solid #1e293b !important;
+    flex-shrink: 0 !important;
 }
 #rg-sidebar .rg-sb-footer button {
     width: 100% !important;
-    padding: 9px 12px !important;
-    border: 1px solid #1e3a5f !important;
-    background: rgba(13, 148, 136, 0.12) !important;
-    color: #5eead4 !important;
+    padding: 8px 12px !important;
+    border: 1px solid #1e2e4f !important;
+    background: #111e38 !important;
+    color: #94a3b8 !important;
     border-radius: 8px !important;
-    font-size: 12px !important;
+    font-size: 11.5px !important;
     font-weight: 700 !important;
     cursor: pointer !important;
     display: flex !important;
     align-items: center !important;
+    justify-content: center !important;
     gap: 8px !important;
     transition: all 0.15s ease !important;
 }
 #rg-sidebar .rg-sb-footer button:hover {
-    background: #0d9488 !important;
-    color: #fff !important;
-    border-color: #0d9488 !important;
+    background: #192a4e !important;
+    color: #f8fafc !important;
+    border-color: #38bdf8 !important;
 }
-/* Push main Gradio content right to make room for sidebar */
-.gradio-container {
-    margin-left: 220px !important;
-    padding-left: 10px !important;
-    max-width: calc(1280px + 220px) !important;
+/* Push main Gradio container right to make room for sidebar */
+@media (min-width: 901px) {
+    gradio-app, .gradio-container {
+        margin-left: 240px !important;
+        max-width: calc(100vw - 260px) !important;
+        width: calc(100vw - 260px) !important;
+        padding-left: 8px !important;
+    }
 }
-.floating-chat-btn {
-    position: fixed !important;
-    right: 18px !important;
-    bottom: 18px !important;
-    z-index: 1201 !important;
-    border-radius: 999px !important;
-    padding: 11px 18px !important;
-    background: #0d9488 !important;
-    color: #fff !important;
-    border: none !important;
-    font-size: 13px !important;
-    font-weight: 700 !important;
-    box-shadow: 0 8px 22px rgba(13,148,136,0.4) !important;
-    cursor: pointer !important;
-    transition: background 0.15s ease !important;
-}
-.floating-chat-btn:hover {
-    background: #0f766e !important;
-}
-/* Sidebar collapse on small screens */
 @media (max-width: 900px) {
     #rg-sidebar {
-        width: 60px;
+        width: 62px !important;
     }
     #rg-sidebar .rg-sb-logo-text,
     #rg-sidebar .rg-sb-logo-sub,
+    #rg-sidebar .rg-sb-search-wrap,
     #rg-sidebar .rg-sb-section-label,
-    #rg-sidebar .rg-sb-nav button span:last-child {
-        display: none;
+    #rg-sidebar .rg-sb-nav button span:not(.rg-sb-icon),
+    #rg-badge,
+    #rg-sidebar .rg-badge,
+    #rg-sidebar .rg-sb-telemetry,
+    #rg-sidebar .rg-sb-footer button span:last-child {
+        display: none !important;
     }
     #rg-sidebar .rg-sb-nav button {
         justify-content: center !important;
         padding: 10px !important;
     }
-    .gradio-container {
-        margin-left: 60px !important;
-        max-width: calc(100% - 60px) !important;
+    gradio-app, .gradio-container {
+        margin-left: 65px !important;
+        max-width: calc(100vw - 75px) !important;
+        width: calc(100vw - 75px) !important;
     }
 }
 @media (max-width: 600px) {
-    #rg-sidebar { display: none; }
-    .gradio-container { margin-left: 0 !important; max-width: 100% !important; }
-    .floating-chat-btn { right: 12px !important; bottom: 12px !important; }
+    #rg-sidebar { display: none !important; }
+    gradio-app, .gradio-container { margin-left: 0 !important; max-width: 100% !important; width: 100% !important; }
 }
 </style>
 """
@@ -1728,7 +1805,7 @@ CUSTOM_CSS = """
 HEAD_SCRIPT = """
 <script>
 (function() {
-    window.retinaOpenTab = function(label) {
+    window.retinaOpenTab = function(label, btnEl) {
         const target = [...document.querySelectorAll('button')].find((button) =>
             button.textContent.includes(label)
         );
@@ -1736,7 +1813,60 @@ HEAD_SCRIPT = """
             target.click();
             setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
         }
+        if (btnEl) {
+            document.querySelectorAll('#rg-sidebar .rg-sb-btn').forEach(b => b.classList.remove('rg-active'));
+            btnEl.classList.add('rg-active');
+        }
     };
+
+    window.retinaToggleTheme = function() {
+        const elApp = document.querySelector('gradio-app');
+        const isDark = document.documentElement.classList.contains('dark') 
+                    || document.body.classList.contains('dark')
+                    || (elApp && elApp.classList.contains('dark'));
+        const targets = [document.documentElement, document.body];
+        if (elApp) targets.push(elApp);
+        
+        if (isDark) {
+            targets.forEach(t => t.classList.remove('dark'));
+            try { localStorage.setItem('retinaguard_theme', 'light'); } catch(e) {}
+        } else {
+            targets.forEach(t => t.classList.add('dark'));
+            try { localStorage.setItem('retinaguard_theme', 'dark'); } catch(e) {}
+        }
+    };
+
+    window.retinaSearch = function(query) {
+        if (!query) return;
+        const q = query.toLowerCase();
+        const tabs = [
+            { text: 'Diagnostic Assessment', match: ['diag', 'result', 'stage', 'cam', 'grad', 'lesion', 'unet', 'vessel', 'optic'] },
+            { text: 'Case-Based Reasoning', match: ['cbr', 'case', 'similar', 'reference', 'embed'] },
+            { text: 'Clinical Management', match: ['care', 'protocol', 'ehr', 'plan', 'urgency', 'referral', 'note'] },
+            { text: 'Multimodal Triage', match: ['triage', 'risk', 'hba1c', 'simulator', 'progression', 'bp'] },
+            { text: 'AI Clinical Chatbot', match: ['chat', 'bot', 'assistant', 'ask', 'question', 'samd'] },
+            { text: 'Session Prediction', match: ['history', 'log', 'past', 'session'] },
+            { text: 'Image Comparison', match: ['report', 'json', 'download', 'compare', 'graham', 'preproc'] },
+            { text: 'Longitudinal Analysis', match: ['longitudinal', 'previous', 'current', 'delta', 'progression'] }
+        ];
+        const found = tabs.find(t => t.match.some(m => q.includes(m)));
+        if (found) {
+            window.retinaOpenTab(found.text);
+        }
+    };
+
+    function mountSidebar() {
+        const sb = document.getElementById('rg-sidebar');
+        if (sb && sb.parentElement && sb.parentElement !== document.body) {
+            document.body.appendChild(sb);
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', mountSidebar);
+    } else {
+        setTimeout(mountSidebar, 100);
+    }
+    setInterval(mountSidebar, 1500);
 })();
 
 (function() {
@@ -1747,7 +1877,6 @@ HEAD_SCRIPT = """
             document.documentElement.classList.add('dark');
             document.body.classList.add('dark');
             const elApp = document.querySelector('gradio-app');
-            if (elApp) elApp.classList.add('dark');
         }
     } catch(e) {}
 })();
@@ -1829,58 +1958,67 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
             </div>
         </div>
 
+        <!-- Search input (ProvoHeal style) -->
+        <div class="rg-sb-search-wrap">
+            <div class="rg-sb-search">
+                <span style="font-size:12px; opacity:0.6;">🔍</span>
+                <input type="text" placeholder="Search features..." oninput="window.retinaSearch(this.value)" />
+                <span class="rg-kbd">⌘K</span>
+            </div>
+        </div>
+
         <!-- Navigation -->
-        <div class="rg-sb-section-label">Navigation</div>
+        <div class="rg-sb-section-label">CLINICAL SUITE</div>
         <div class="rg-sb-nav">
-            <button onclick="window.retinaOpenTab('Diagnostic Assessment')" title="Diagnostic Assessment">
+            <button class="rg-sb-btn rg-active" onclick="window.retinaOpenTab('Diagnostic Assessment', this)" title="Diagnostic Assessment">
                 <span class="rg-sb-icon">🩺</span>
-                <span>Diagnosis</span>
+                <span>Diagnosis &amp; CV</span>
             </button>
-            <button onclick="window.retinaOpenTab('Case-Based Reasoning')" title="Case-Based Reasoning (CBR)">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Case-Based Reasoning', this)" title="Case-Based Reasoning (CBR)">
                 <span class="rg-sb-icon">📚</span>
                 <span>CBR Evidence</span>
             </button>
-            <button onclick="window.retinaOpenTab('Clinical Management')" title="Clinical Management &amp; EHR">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Clinical Management', this)" title="Clinical Management &amp; EHR">
                 <span class="rg-sb-icon">📋</span>
-                <span>Care Plan</span>
+                <span>Care Protocol</span>
             </button>
-            <button onclick="window.retinaOpenTab('Multimodal Triage')" title="Triage &amp; Risk Simulator">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Multimodal Triage', this)" title="Triage &amp; Risk Simulator">
                 <span class="rg-sb-icon">🚦</span>
-                <span>Triage</span>
+                <span>Multimodal Triage</span>
             </button>
-            <button onclick="window.retinaOpenTab('AI Clinical Chatbot')" title="AI Clinical Chatbot">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('AI Clinical Chatbot', this)" title="AI Clinical Chatbot">
                 <span class="rg-sb-icon">💬</span>
-                <span>Chatbot</span>
+                <span>AI Chatbot</span>
+                <span class="rg-badge">AAO</span>
             </button>
-            <button onclick="window.retinaOpenTab('Session Prediction')" title="Session Prediction History">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Session Prediction', this)" title="Session Prediction History">
                 <span class="rg-sb-icon">📜</span>
-                <span>History</span>
+                <span>Prediction History</span>
             </button>
-            <button onclick="window.retinaOpenTab('Image Comparison')" title="Image Comparison &amp; Report">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Image Comparison', this)" title="Image Comparison &amp; Report">
                 <span class="rg-sb-icon">🖼️</span>
-                <span>Reports</span>
+                <span>Image Reports</span>
             </button>
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Longitudinal Analysis', this)" title="Longitudinal Retinal Analysis">
+                <span class="rg-sb-icon">📊</span>
+                <span>Longitudinal View</span>
+            </button>
+        </div>
+
+        <!-- Telemetry status chip -->
+        <div class="rg-sb-telemetry">
+            <div style="display:flex; align-items:center; gap:6px;">
+                <span class="rg-status-dot"></span>
+                <span style="font-size:11px; font-weight:700; color:#38bdf8;">Governance Active</span>
+            </div>
+            <div style="font-size:10px; color:#64748b; margin-top:2px;">EfficientNetB3 · U-Net · CBR</div>
         </div>
 
         <!-- Footer -->
         <div class="rg-sb-footer">
-            <button onclick="(function(){
-                const elApp = document.querySelector('gradio-app');
-                const isDark = document.documentElement.classList.contains('dark')
-                    || document.body.classList.contains('dark')
-                    || (elApp && elApp.classList.contains('dark'));
-                const targets = [document.documentElement, document.body];
-                if (elApp) targets.push(elApp);
-                if (isDark) {
-                    targets.forEach(t => t.classList.remove('dark'));
-                    try { localStorage.setItem('retinaguard_theme','light'); } catch(e) {}
-                } else {
-                    targets.forEach(t => t.classList.add('dark'));
-                    try { localStorage.setItem('retinaguard_theme','dark'); } catch(e) {}
-                }
-            })()" title="Toggle Dark / Light">
+            <button onclick="window.retinaToggleTheme()" title="Toggle Dark / Light">
                 <span>🌓</span>
-                <span>Dark / Light</span>
+                <span>Dark / Light Mode</span>
             </button>
         </div>
     </div>
