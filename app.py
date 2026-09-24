@@ -238,12 +238,17 @@ _CHATBOT_FALLBACK = (
 )
 
 
-def respond_to_clinical_query(message: str, history: List, pred_context: dict = None) -> tuple:
+def respond_to_clinical_query(message: str, history: Optional[List] = None, pred_context: dict = None) -> tuple:
     """Rule-based clinical knowledge chatbot for DR staging and model architecture queries.
     If pred_context is provided (from the current analysis), context-aware questions are answered."""
-    if not message or not message.strip():
+    if history is None:
+        history = []
+    else:
+        history = list(history)
+
+    if not message or not str(message).strip():
         return history, ""
-    query = message.lower().strip()
+    query = str(message).lower().strip()
     reply = None
 
     # Context-aware answers about the current prediction
@@ -1955,14 +1960,80 @@ gradio-app {
 HEAD_SCRIPT = """
 <script>
 (function() {
-    window.retinaOpenTab = function(label, btnEl) {
-        const target = [...document.querySelectorAll('button')].find((button) =>
-            button.textContent.includes(label)
-        );
+    window.retinaOpenTab = function(label, btnEl, elemId) {
+        function findTarget() {
+            const app = document.querySelector('gradio-app');
+            const roots = [];
+            if (app && app.shadowRoot) roots.push(app.shadowRoot);
+            roots.push(document);
+            if (app) roots.push(app);
+
+            // 1. Check by ID if elemId provided
+            if (elemId) {
+                const possibleIds = [elemId, `${elemId}-button`, elemId.replace('-button', '')];
+                for (const r of roots) {
+                    for (const pid of possibleIds) {
+                        try {
+                            const el = (r.getElementById && r.getElementById(pid)) || (r.querySelector && r.querySelector(`#${pid}`));
+                            if (el) return el;
+                        } catch(e) {}
+                    }
+                }
+            }
+
+            // 2. Query tab buttons by class / role / text in roots
+            const cleanLabel = (label || '').toLowerCase().trim();
+            for (const r of roots) {
+                try {
+                    const candidates = Array.from(r.querySelectorAll('button, [role="tab"], .tab-nav button, .tabs button'));
+                    for (const c of candidates) {
+                        if (c.closest && c.closest('#rg-sidebar')) continue;
+                        const txt = (c.textContent || '').toLowerCase();
+                        if (cleanLabel && txt.includes(cleanLabel)) {
+                            return c;
+                        }
+                    }
+                } catch(e) {}
+            }
+
+            // 3. Fallback: recursive shadow DOM search
+            function searchDeep(node) {
+                if (!node) return null;
+                if (node.shadowRoot) {
+                    const res = searchDeep(node.shadowRoot);
+                    if (res) return res;
+                }
+                const children = node.children || [];
+                for (let i = 0; i < children.length; i++) {
+                    const child = children[i];
+                    if (child.tagName === 'BUTTON' || child.getAttribute('role') === 'tab') {
+                        if (!child.closest || !child.closest('#rg-sidebar')) {
+                            const txt = (child.textContent || '').toLowerCase();
+                            if (cleanLabel && txt.includes(cleanLabel)) return child;
+                        }
+                    }
+                    const res = searchDeep(child);
+                    if (res) return res;
+                }
+                return null;
+            }
+
+            return searchDeep(app) || searchDeep(document.body);
+        }
+
+        const target = findTarget();
         if (target) {
             target.click();
-            setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+            try {
+                target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
+            } catch(e) {}
+            setTimeout(() => {
+                try { target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch(e) {}
+            }, 60);
+        } else {
+            console.warn('[RetinaGuard] Tab target not found for:', label, elemId);
         }
+
         if (btnEl) {
             document.querySelectorAll('#rg-sidebar .rg-sb-btn').forEach(b => b.classList.remove('rg-active'));
             btnEl.classList.add('rg-active');
@@ -2054,24 +2125,16 @@ THEME_TOGGLE_JS = """
 
 OPEN_CHATBOT_JS = """
 () => {
-    const target = [...document.querySelectorAll('button')].find((button) =>
-        button.textContent.includes('AI Clinical Chatbot')
-    );
-    if (target) {
-        target.click();
-        setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    if (window.retinaOpenTab) {
+        window.retinaOpenTab('AI Clinical Chatbot', null, 'rg-tab-chat');
     }
 }
 """
 
 OPEN_TAB_JS = """
 (label) => {
-    const target = [...document.querySelectorAll('button')].find((button) =>
-        button.textContent.includes(label)
-    );
-    if (target) {
-        target.click();
-        setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    if (window.retinaOpenTab) {
+        window.retinaOpenTab(label);
     }
 }
 """
@@ -2081,12 +2144,8 @@ def open_tab_js(label: str) -> str:
     """Build Gradio-supported JavaScript for activating an existing tab."""
     escaped_label = label.replace("'", "\\'")
     return f"""() => {{
-        const target = [...document.querySelectorAll('button')].find((button) =>
-            button.textContent.includes('{escaped_label}')
-        );
-        if (target) {{
-            target.click();
-            setTimeout(() => target.scrollIntoView({{ behavior: 'smooth', block: 'start' }}), 80);
+        if (window.retinaOpenTab) {{
+            window.retinaOpenTab('{escaped_label}');
         }}
     }}"""
 
@@ -2120,36 +2179,36 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
         <!-- Navigation -->
         <div class="rg-sb-section-label">CLINICAL SUITE</div>
         <div class="rg-sb-nav">
-            <button class="rg-sb-btn rg-active" onclick="window.retinaOpenTab('Diagnostic Assessment', this)" title="Diagnostic Assessment">
+            <button class="rg-sb-btn rg-active" onclick="window.retinaOpenTab('Diagnostic Assessment', this, 'rg-tab-diag')" title="Diagnostic Assessment">
                 <span class="rg-sb-icon">🩺</span>
                 <span>Diagnosis &amp; CV</span>
             </button>
-            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Case-Based Reasoning', this)" title="Case-Based Reasoning (CBR)">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Case-Based Reasoning', this, 'rg-tab-cbr')" title="Case-Based Reasoning (CBR)">
                 <span class="rg-sb-icon">📚</span>
                 <span>CBR Evidence</span>
             </button>
-            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Clinical Management', this)" title="Clinical Management &amp; EHR">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Clinical Management', this, 'rg-tab-care')" title="Clinical Management &amp; EHR">
                 <span class="rg-sb-icon">📋</span>
                 <span>Care Protocol</span>
             </button>
-            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Multimodal Triage', this)" title="Triage &amp; Risk Simulator">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Multimodal Triage', this, 'rg-tab-triage')" title="Triage &amp; Risk Simulator">
                 <span class="rg-sb-icon">🚦</span>
                 <span>Multimodal Triage</span>
             </button>
-            <button class="rg-sb-btn" onclick="window.retinaOpenTab('AI Clinical Chatbot', this)" title="AI Clinical Chatbot">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('AI Clinical Chatbot', this, 'rg-tab-chat')" title="AI Clinical Chatbot">
                 <span class="rg-sb-icon">💬</span>
                 <span>AI Chatbot</span>
                 <span class="rg-badge">AAO</span>
             </button>
-            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Session Prediction', this)" title="Session Prediction History">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Session Prediction', this, 'rg-tab-history')" title="Session Prediction History">
                 <span class="rg-sb-icon">📜</span>
                 <span>Prediction History</span>
             </button>
-            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Image Comparison', this)" title="Image Comparison &amp; Report">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Image Comparison', this, 'rg-tab-compare')" title="Image Comparison &amp; Report">
                 <span class="rg-sb-icon">🖼️</span>
                 <span>Image Reports</span>
             </button>
-            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Longitudinal Analysis', this)" title="Longitudinal Retinal Analysis">
+            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Longitudinal Analysis', this, 'rg-tab-longitudinal')" title="Longitudinal Retinal Analysis">
                 <span class="rg-sb-icon">📊</span>
                 <span>Longitudinal View</span>
             </button>
@@ -2174,7 +2233,7 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
     </div>
 
     <!-- Floating chat pill button (pure HTML, fixed bottom-right, zero flow disruption) -->
-    <div class="rg-floating-chat-pill" onclick="window.retinaOpenTab('AI Clinical Chatbot')" title="Open AI Clinical Assistant">
+    <div class="rg-floating-chat-pill" onclick="window.retinaOpenTab('AI Clinical Chatbot', null, 'rg-tab-chat')" title="Open AI Clinical Assistant">
         💬 AI Chatbot
     </div>
     """)
@@ -2253,7 +2312,7 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
             # Structured Tabs
             with gr.Tabs():
                 # Tab 1: Primary Diagnosis & 3-Layer Explainability
-                with gr.TabItem("🏥 Diagnostic Assessment & Explainability"):
+                with gr.TabItem("🏥 Diagnostic Assessment & Explainability", elem_id="rg-tab-diag"):
                     uncertainty_banner_top = gr.HTML()
                     hero_diagnosis = gr.HTML()
                     prob_distribution = gr.Label(label="5-Stage Disease Probability Distribution (Softmax)", num_top_classes=5)
@@ -2287,7 +2346,7 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                         confidence_margin_view = gr.HTML()
 
                 # Tab 2: Case-Based Reasoning (CBR) Evidence
-                with gr.TabItem("📚 Case-Based Reasoning (CBR) Evidence"):
+                with gr.TabItem("📚 Case-Based Reasoning (CBR) Evidence", elem_id="rg-tab-cbr"):
                     gr.Markdown("### 🔎 Nearest Available Reference Cases")
                     gr.Markdown(
                         "The query image was projected into the 256-D penultimate feature bottleneck. "
@@ -2296,13 +2355,13 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                     gallery_view = gr.Gallery(columns=3, rows=1, height=260, object_fit="contain")
 
                 # Tab 3: Clinical Care Protocol & EHR Note
-                with gr.TabItem("📋 Clinical Management & EHR Note"):
+                with gr.TabItem("📋 Clinical Management & EHR Note", elem_id="rg-tab-care"):
                     advisory_view = gr.HTML()
                     gr.Markdown("### 📄 Exportable Electronic Health Record (EHR) Summary Note")
                     ehr_note_box = gr.Textbox(label="Clinical Session Note (Copy to Clipboard)", lines=12, interactive=False)
 
                 # Tab 4: AI Clinical Chatbot & SaMD Guidelines
-                with gr.TabItem("💬 AI Clinical Chatbot"):
+                with gr.TabItem("💬 AI Clinical Chatbot", elem_id="rg-tab-chat"):
                     gr.Markdown("""
                     ### 🤖 RetinaGuard Clinical Knowledge Assistant
                     Ask any question about diabetic retinopathy stages, the model architecture, preprocessing pipeline,
@@ -2316,6 +2375,7 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                             chatbot_widget = gr.Chatbot(
                                 label="Clinical Knowledge Assistant",
                                 height=420,
+                                value=[],
                             )
                             with gr.Row():
                                 chat_input = gr.Textbox(
@@ -2343,7 +2403,7 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                             """)
 
                 # Tab 5: Multimodal Clinical Triage & Risk Simulator
-                with gr.TabItem("🚦 Multimodal Triage & 10-Yr Risk Simulator"):
+                with gr.TabItem("🚦 Multimodal Triage & 10-Yr Risk Simulator", elem_id="rg-tab-triage"):
                     gr.Markdown("""
                     ### 🏥 Multimodal Clinical Triage & Progression Risk Simulator
                     Integrates the **image-derived DR severity stage** with systemic endocrinology indicators 
@@ -2363,13 +2423,13 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                     )
 
                 # Tab 6: Prediction History
-                with gr.TabItem("📜 Session Prediction History"):
+                with gr.TabItem("📜 Session Prediction History", elem_id="rg-tab-history"):
                     gr.Markdown("### 🕐 Prediction History — Current Session")
                     gr.Markdown("Each analysis run is logged here for comparison during the same session. History resets on page refresh.")
                     session_history_view = gr.HTML('<div style="color:#94a3b8; font-size:13px; padding:12px;">No predictions yet.</div>')
 
                 # Tab 7: Image Comparison & Download
-                with gr.TabItem("🖼️ Image Comparison & Report"):
+                with gr.TabItem("🖼️ Image Comparison & Report", elem_id="rg-tab-compare"):
                     gr.Markdown("### 📸 Original vs. Preprocessed Fundus Image")
                     gr.Markdown("Left: raw upload. Right: after Ben Graham enhancement, circular crop, and 224×224 resize.")
                     with gr.Row():
@@ -2382,7 +2442,7 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                     download_btn = gr.Button("⬇️ Generate & Download Report (JSON)", variant="primary")
                     download_file = gr.File(label="Download", visible=False)
 
-                with gr.TabItem("📊 Longitudinal Analysis"):
+                with gr.TabItem("📊 Longitudinal Analysis", elem_id="rg-tab-longitudinal"):
                     gr.Markdown("### Optional Previous vs Current Examination Comparison")
                     gr.Markdown("Do not assume the images belong to the same patient. Results are visual comparisons only, not confirmed disease progression.")
                     with gr.Row():
