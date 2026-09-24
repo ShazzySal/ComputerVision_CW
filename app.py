@@ -1500,11 +1500,11 @@ gradio-app {
     background: #f0fdfa;
     border: 1px solid #a7f3d0;
     border-radius: 10px;
-    padding: 10px 18px;
-    margin-bottom: 16px;
+    padding: 6px 12px;
+    margin-bottom: 8px;
     color: #065f46 !important;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
 .stepper-item {
@@ -1560,8 +1560,8 @@ gradio-app {
     background: #ffffff;
     border-radius: 10px;
     border: 1px solid #e2e8f0;
-    padding: 12px 14px;
-    margin-bottom: 12px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 .dark .patient-id-card {
@@ -2189,65 +2189,65 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
     _diag_followup_state = gr.State("")
     _diag_plan_state = gr.State("")
 
-    # 1. Main Header & Telemetry Bar
-    with gr.Row():
-        with gr.Column(scale=9):
-            gr.HTML("""
-            <div style="text-align:left;">
-                <h1 class="header-title" style="margin:0; font-size:26px; font-weight:800; letter-spacing:-0.5px;">
-                    👁️ RetinaGuard AI: Clinical Decision Support & Governance System
-                </h1>
-                <p class="header-subtitle" style="margin:4px 0 0 0; font-size:14px;">
-                    Multi-Stage Diabetic Retinopathy Diagnostic Pipeline • BSc (Hons) Computer Science Coursework
-                </p>
+    # ── Compact top strip: title + telemetry + stepper all-in-one ──────
+    gr.HTML("""
+    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+
+        <!-- Row 1: Title + Toggle + Tech badge -->
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:20px;">👁️</span>
+                <div>
+                    <div class="header-title" style="font-size:17px; font-weight:800; letter-spacing:-0.3px; margin:0; line-height:1.1;">
+                        RetinaGuard AI <span style="color:#0d9488; font-weight:600;">Clinical Decision Support</span>
+                    </div>
+                    <div class="header-subtitle" style="font-size:11px; margin:0;">
+                        Multi-Stage Diabetic Retinopathy Pipeline &bull; BSc (Hons) Computer Science
+                    </div>
+                </div>
             </div>
-            """)
-        with gr.Column(scale=3, min_width=220):
-            theme_toggle_btn = gr.Button("🌓 Toggle Dark / Light", size="sm", elem_classes=["theme-toggle-btn"])
-            gr.HTML("""
-            <div style="text-align:right; margin-top:4px;">
-                <span style="background:#e0f2fe; color:#0369a1; padding:4px 10px; border-radius:6px; font-weight:700; font-size:12px;">
-                    EfficientNetB3 • Grad-CAM • U-Net • CBR
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span style="background:#e0f2fe; color:#0369a1; padding:3px 9px; border-radius:6px; font-weight:700; font-size:11px; white-space:nowrap;">
+                    EfficientNetB3 &bull; Grad-CAM &bull; U-Net &bull; CBR
                 </span>
             </div>
-            """)
+        </div>
 
-    gr.HTML("""
-    <div class="telemetry-bar">
-        <div style="display:flex; align-items:center; gap:8px;">
-            <div class="pulse-dot"></div>
-            <strong style="color:#f8fafc; font-size:13px;">ACTIVE MULTI-AGENT TELEMETRY</strong>
+        <!-- Row 2: Telemetry strip -->
+        <div style="display:flex; align-items:center; justify-content:space-between; background:#0f172a; border:1px solid #1e293b; border-radius:8px; padding:7px 14px; flex-wrap:wrap; gap:6px;">
+            <div style="display:flex; align-items:center; gap:7px;">
+                <div class="pulse-dot"></div>
+                <strong style="color:#f8fafc; font-size:11px; letter-spacing:0.4px;">MULTI-AGENT TELEMETRY</strong>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <div class="telemetry-badge">🩺 DiagnosisAgent: <strong>Online</strong></div>
+                <div class="telemetry-badge">🔬 ExplainabilityAgent: <strong>Online</strong></div>
+                <div class="telemetry-badge">📋 AdvisoryAgent: <strong>Online</strong></div>
+                <div class="telemetry-badge" style="border-color:#38bdf8;">🛡️ GovernanceGate: <strong>Active</strong></div>
+            </div>
         </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <div class="telemetry-badge">🩺 DiagnosisAgent: <strong>Online</strong></div>
-            <div class="telemetry-badge">🔬 ExplainabilityAgent: <strong>Online</strong></div>
-            <div class="telemetry-badge">📋 AdvisoryAgent: <strong>Online</strong></div>
-            <div class="telemetry-badge" style="border-color:#38bdf8;">🛡️ GovernanceGate: <strong>Active</strong></div>
-        </div>
-    </div>
-    """)
 
-    # Clinical Workflow Stepper Bar (Medios / Mobile Screening Workflow)
-    gr.HTML("""
-    <div class="stepper-container">
-        <div class="stepper-item">
-            <span class="stepper-circle">01</span>
-            <div><div class="stepper-title">CLINICAL INTAKE</div><div class="stepper-sub">Patient Profile &amp; HbA1c</div></div>
-        </div>
-        <div class="stepper-arrow">➔</div>
-        <div class="stepper-item">
-            <span class="stepper-circle">02</span>
-            <div><div class="stepper-title">IMAGE ACQUISITION</div><div class="stepper-sub">Optical Quality Check</div></div>
-        </div>
-        <div class="stepper-arrow">➔</div>
-        <div class="stepper-item">
-            <span class="stepper-circle">03</span>
-            <div><div class="stepper-title">AI SAFETY GATE</div><div class="stepper-sub">70% Threshold &amp; Override</div></div>
-        </div>
-        <div class="stepper-arrow">➔</div>
-        <div class="stepper-item">
-            <span class="stepper-circle">04</span>
-            <div><div class="stepper-title">CLINICAL DOSSIER</div><div class="stepper-sub">Triage, Grad-CAM &amp; 10-Yr Risk</div></div>
+        <!-- Row 3: Compact stepper -->
+        <div class="stepper-container" style="padding:7px 14px; margin-bottom:0;">
+            <div class="stepper-item">
+                <span class="stepper-circle">01</span>
+                <div><div class="stepper-title">INTAKE</div><div class="stepper-sub">Patient &amp; HbA1c</div></div>
+            </div>
+            <div class="stepper-arrow">➔</div>
+            <div class="stepper-item">
+                <span class="stepper-circle">02</span>
+                <div><div class="stepper-title">IMAGE</div><div class="stepper-sub">Quality Check</div></div>
+            </div>
+            <div class="stepper-arrow">➔</div>
+            <div class="stepper-item">
+                <span class="stepper-circle">03</span>
+                <div><div class="stepper-title">SAFETY GATE</div><div class="stepper-sub">Threshold &amp; Override</div></div>
+            </div>
+            <div class="stepper-arrow">➔</div>
+            <div class="stepper-item">
+                <span class="stepper-circle">04</span>
+                <div><div class="stepper-title">DOSSIER</div><div class="stepper-sub">Triage &amp; Risk</div></div>
+            </div>
         </div>
     </div>
     """)
@@ -2257,15 +2257,15 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
         # Left Column: Upload & Governance Configuration
         with gr.Column(scale=4):
             gr.HTML("""
-            <div class="patient-id-card">
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:8px; margin-bottom:8px;">
+            <div class="patient-id-card" style="padding:6px 10px; margin-bottom:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:5px; margin-bottom:5px;">
                     <div>
                         <div style="font-size:10px; color:#64748b; font-weight:800; text-transform:uppercase;">EHR Active Screening Record</div>
-                        <div style="font-size:15px; font-weight:800; color:#0f172a;">MRN: RG-2026-9812 &bull; Test Patient</div>
+                        <div style="font-size:13px; font-weight:800; color:#0f172a;">MRN: RG-2026-9812 &bull; Test Patient</div>
                     </div>
                     <span class="badge-quota">⚡ 99 SCANS LEFT</span>
                 </div>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                <div style="display:flex; flex-wrap:wrap; gap:5px;">
                     <span class="patient-chip">👤 Age: 55y</span>
                     <span class="patient-chip">🩺 Type 2 DM</span>
                     <span class="patient-chip">⏳ 10 Years</span>
@@ -2274,15 +2274,18 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                 </div>
             </div>
             """)
-            gr.Markdown("### 📥 Retinal Photography Input")
-            input_image = gr.Image(label="Upload Fundus Photo", type="numpy", height=280)
+            input_image = gr.Image(label="📥 Upload Fundus Photo", type="numpy", height=210)
 
             # Quick Preset Buttons
-            gr.Markdown("**⚡ Quick-Load Test Samples (No download needed):**")
             with gr.Row():
-                btn_normal = gr.Button("🟢 Normal (Stage 0)", size="sm")
-                btn_moderate = gr.Button("🟡 Moderate (Stage 2)", size="sm")
-                btn_prolif = gr.Button("🔴 Proliferative (Stage 4)", size="sm")
+                btn_normal = gr.Button("🟢 Normal", size="sm")
+                btn_moderate = gr.Button("🟡 Moderate", size="sm")
+                btn_prolif = gr.Button("🔴 Proliferative", size="sm")
+
+            # ── Run button immediately after upload (always visible) ──────────
+            with gr.Row():
+                submit_btn = gr.Button("🚀 Run Diagnostic Analysis", variant="primary", size="lg", scale=3, elem_classes=["action-btn"])
+                btn_clear = gr.Button("🔄 Reset", variant="secondary", size="lg", scale=1)
 
             with gr.Accordion("🛡️ Safety gate & patient context", open=False):
                 threshold_slider = gr.Slider(
@@ -2300,10 +2303,6 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
                 hba1c_level = gr.Slider(minimum=5.0, maximum=14.0, value=7.5, step=0.1, label="HbA1c (%)")
                 diabetes_duration = gr.Slider(minimum=0, maximum=40, value=10, step=1, label="Duration of Diabetes (years)")
                 systolic_bp = gr.Slider(minimum=90, maximum=220, value=135, step=1, label="Systolic Blood Pressure (mmHg)")
-            gr.Markdown("---")
-            with gr.Row():
-                submit_btn = gr.Button("🚀 Run Diagnostic Analysis", variant="primary", size="lg", scale=3, elem_classes=["action-btn"])
-                btn_clear = gr.Button("🔄 Reset", variant="secondary", size="lg", scale=1)
 
         # Right Column: Multi-Tab Clinical Dossier
         with gr.Column(scale=6):
@@ -2752,13 +2751,7 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
         outputs=[original_img_view],
     )
 
-    # Theme Toggle Event Handler (Client-Side JavaScript)
-    theme_toggle_btn.click(
-        fn=None,
-        inputs=None,
-        outputs=None,
-        js=THEME_TOGGLE_JS,
-    )
+
 
     # ── Chatbot Event Handlers ──────────────────────────────────────────────
     # -- Quick-Prompt Chip Handlers
