@@ -402,7 +402,15 @@ class GovernanceAgent:
             msg = f"Safety Verified: Model confidence ({conf*100:.1f}%) satisfies the clinical safety threshold ({self.threshold*100:.0f}%)."
             adv_controlled = adv
 
-        return {"flagged": flagged, "message": msg, "diagnosis": diag, "explanation": expl, "advisory": adv_controlled}
+        return {
+            "flagged": flagged,
+            "flagged_for_review": flagged,
+            "confidence": conf,
+            "message": msg,
+            "diagnosis": diag,
+            "explanation": expl,
+            "advisory": adv_controlled,
+        }
 
 
 def run_pipeline(preproc_img: np.ndarray, threshold: float = AppConfig.DEFAULT_CONFIDENCE_THRESHOLD) -> Dict[str, Any]:
@@ -541,7 +549,7 @@ _CLINICAL_KB: List[Dict[str, Any]] = [
             "**Case-Based Reasoning (CBR) — Similar Case Retrieval**\n\n"
             "After diagnosis, RetinaGuard extracts a **256-dimensional feature vector** "
             "from the penultimate dense layer (`head_dense`) of the classifier.\n\n"
-            "This embedding is compared against 50 pre-cached reference case embeddings "
+            "This embedding is compared against 250 pre-cached reference case embeddings "
             "stored in `embeddings.npz` using **cosine similarity**. The top-3 most "
             "similar historical cases are retrieved and displayed with their DR stages.\n\n"
             "This provides clinicians with precedent-based diagnostic context, "
@@ -767,7 +775,7 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float):
     advisory_html = f"""
     <div class="card">
         <h3 class="protocol-title" style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:8px;">📋 Clinical Care Protocol (AAO Preferred Practice Pattern)</h3>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div class="responsive-grid responsive-grid-two" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
             <div class="protocol-box" style="padding:10px; border-radius:6px;">
                 <div class="protocol-label" style="font-size:11px; font-weight:700; text-transform:uppercase;">Clinical Urgency Level</div>
                 <div class="protocol-val" style="font-size:15px; font-weight:700; margin-top:2px;">{adv['urgency']}</div>
@@ -872,7 +880,7 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float):
         f'<div style="margin-top:8px; padding:10px 14px; background:#f8fafc; border-radius:8px; border-left:4px solid {margin_color};">'
         f'<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#64748b; margin-bottom:6px;">'
         f'Diagnostic Uncertainty Margin (Adjacent-Stage Analysis)</div>'
-        f'<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; text-align:center;">'
+        f'<div class="responsive-grid responsive-grid-three" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; text-align:center;">'
         f'<div style="background:#fff; border-radius:6px; padding:8px; border:1px solid #e2e8f0;">'
         f'<div style="font-size:10px; color:#64748b; font-weight:600;">PRIMARY</div>'
         f'<div style="font-size:13px; font-weight:700; color:#1e293b;">{top_stage_name}</div>'
@@ -1144,6 +1152,50 @@ CUSTOM_CSS = """
 }
 .action-btn:hover {
     box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3) !important;
+}
+
+/* Keep dense result cards usable on phones and small tablet widths. */
+@media (max-width: 700px) {
+    .gradio-container {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+
+    .header-title {
+        font-size: 21px !important;
+        line-height: 1.2 !important;
+    }
+
+    .telemetry-bar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .telemetry-bar > div:last-child {
+        width: 100%;
+    }
+
+    .telemetry-badge {
+        font-size: 11px;
+        padding: 4px 7px;
+    }
+
+    .hero-stage-title {
+        font-size: 21px !important;
+    }
+
+    .gallery {
+        min-width: 0 !important;
+    }
+
+    .chatbot {
+        height: 320px !important;
+    }
+
+    .responsive-grid-two,
+    .responsive-grid-three {
+        grid-template-columns: 1fr !important;
+    }
 }
 </style>
 """
