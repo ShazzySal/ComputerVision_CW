@@ -323,6 +323,35 @@ def find_similar_cases(query_arr: np.ndarray, k: int = 3) -> List[Dict[str, Any]
     return results
 
 
+def extract_classical_cv_biomarkers(preproc_img: np.ndarray) -> Dict[str, Any]:
+    """Extracts deterministic classical CV biomarkers (CLAHE, Sobel gradients, Top-Hat morphology)
+    to complement deep feature representations and fulfill syllabus requirements.
+    """
+    gray = cv2.cvtColor((np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8), cv2.COLOR_RGB2GRAY)
+    
+    # 1. Histogram Processing: CLAHE (Contrast-Limited Adaptive Histogram Equalization)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    equalized = clahe.apply(gray)
+    
+    # 2. Convolution & Gradient Edge Detection: 3x3 Sobel Filters
+    sobel_x = cv2.Sobel(equalized, cv2.CV_64F, 1, 0, ksize=3)
+    sobel_y = cv2.Sobel(equalized, cv2.CV_64F, 0, 1, ksize=3)
+    grad_mag = np.sqrt(sobel_x**2 + sobel_y**2)
+    edge_density = float(np.mean(grad_mag > np.percentile(grad_mag, 85)) * 100.0)
+    
+    # 3. Mathematical Morphology: Top-Hat with Elliptical Structuring Element (5x5)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    tophat = cv2.morphologyEx(equalized, cv2.MORPH_TOPHAT, kernel)
+    morph_candidate_pct = float(np.mean(tophat > 25) * 100.0)
+    
+    return {
+        "sobel_edge_density": edge_density,
+        "morph_candidate_pct": morph_candidate_pct,
+        "mean_gradient": float(np.mean(grad_mag)),
+        "clahe_status": "Calibrated (Clip=2.0)",
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. Multi-Agent Clinical Decision Pipeline
 # ─────────────────────────────────────────────────────────────────────────────
@@ -348,6 +377,7 @@ class ExplainabilityAgent:
         lesion_seg, lesion_pct = segment_retinal_lesions(preproc_img, heat, stage)
         quad_desc, quad_scores, peak_quad, peak_val = generate_quadrant_description(heat, stage)
         sim_cases = find_similar_cases(preproc_img, k=3)
+        classical_cv = extract_classical_cv_biomarkers(preproc_img)
         return {
             "overlay_cam": overlay_cam,
             "lesion_seg": lesion_seg,
@@ -357,6 +387,7 @@ class ExplainabilityAgent:
             "peak_quadrant": peak_quad,
             "peak_val": peak_val,
             "similar_cases": sim_cases,
+            "classical_cv": classical_cv,
         }
 
 
@@ -838,6 +869,37 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float):
         f'<div style="font-size:12px; color:{burden_color}; font-weight:600; margin-top:2px;">{burden_label}</div>'
         f'</div>'
     )
+
+    # Classical Computer Vision Biomarkers Panel (OpenCV Syllabus Alignment)
+    classical_cv = expl.get("classical_cv", {})
+    edge_density = classical_cv.get("sobel_edge_density", 0.0)
+    morph_pct = classical_cv.get("morph_candidate_pct", 0.0)
+    clahe_status = classical_cv.get("clahe_status", "Calibrated (Clip=2.0)")
+
+    classical_cv_html = (
+        '<div style="margin-top:10px; padding:12px 14px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; border-left:4px solid #0284c7;">'
+        '<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#0369a1; margin-bottom:8px; display:flex; align-items:center; gap:6px;">'
+        '<span>🔬</span> Classical Computer Vision Biomarkers (OpenCV)</div>'
+        '<div class="responsive-grid responsive-grid-three" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; text-align:center;">'
+        '<div style="background:#fff; border-radius:6px; padding:8px; border:1px solid #e2e8f0;">'
+        '<div style="font-size:10px; color:#64748b; font-weight:600;">SOBEL GRADIENT</div>'
+        f'<div style="font-size:16px; font-weight:800; color:#0f172a; margin:2px 0;">{edge_density:.1f}%</div>'
+        '<div style="font-size:10px; color:#64748b;">Vascular Edge Density</div></div>'
+        '<div style="background:#fff; border-radius:6px; padding:8px; border:1px solid #e2e8f0;">'
+        '<div style="font-size:10px; color:#64748b; font-weight:600;">CLAHE HISTOGRAM</div>'
+        f'<div style="font-size:13px; font-weight:800; color:#059669; margin:4px 0;">{clahe_status}</div>'
+        '<div style="font-size:10px; color:#64748b;">Adaptive Local Contrast</div></div>'
+        '<div style="background:#fff; border-radius:6px; padding:8px; border:1px solid #e2e8f0;">'
+        '<div style="font-size:10px; color:#64748b; font-weight:600;">MORPHOLOGY</div>'
+        f'<div style="font-size:16px; font-weight:800; color:#d97706; margin:2px 0;">{morph_pct:.1f}%</div>'
+        '<div style="font-size:10px; color:#64748b;">Top-Hat Lesion Sites</div></div>'
+        '</div>'
+        '<div style="font-size:10px; color:#64748b; margin-top:8px; font-style:italic;">'
+        'Deterministic physical image processing features (Convolution, Morphology, Histograms) extracted in parallel with deep embeddings.</div>'
+        '</div>'
+    )
+
+    lesion_burden_html = lesion_burden_html + classical_cv_html
 
     # 8. Anatomical Quadrant Salience HTML bar chart
     quad_scores = expl.get("quadrant_scores", {})
