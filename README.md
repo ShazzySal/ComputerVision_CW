@@ -56,13 +56,20 @@ This coursework project presents an end-to-end, safety-critical computer vision 
 ```
 Computer-Vision-CW/
 ├── diabetic_retinopathy_detection.ipynb  # Primary end-to-end research notebook (Sections 1-11)
-├── app.py                                # Standalone Gradio web application (Hugging Face Spaces)
+├── app.py                                # Gradio UI, callbacks, and deployment entry point
+├── core/                                  # Reusable backend modules
+│   ├── __init__.py
+│   ├── config.py                          # Shared application settings and checkpoint paths
+│   ├── preprocessing.py                   # Fundus cropping, resizing, and Ben Graham enhancement
+│   ├── models.py                          # EfficientNetB3, U-Net, Grad-CAM, and embeddings
+│   ├── explainability.py                  # Grad-CAM, retrieval, segmentation, and classical CV
+│   └── agents.py                          # Diagnosis, advisory, explainability, and governance
 ├── requirements.txt                      # Complete pinned Python environment dependencies
 ├── README.md                             # Comprehensive technical documentation & reproduction guide
 ├── checkpoints/                          # Saved model weight checkpoints
 │   ├── best_phase1.weights.h5            # Frozen-base feature extraction checkpoint
 │   └── best_phase2.weights.h5            # Fine-tuned end-to-end model weights
-└── report_images/                        # Automated diagnostic artifacts for technical report
+└── report_images/                        # Saved project figures, metrics, and logs
     ├── class_distribution.png            # Imbalance breakdown visualization
     ├── preprocessing_class*.png          # Ben Graham & border-crop comparison grids
     ├── augmentation_examples.png         # Stochastic transform validation panels
@@ -87,9 +94,9 @@ All core innovations in this project are directly grounded in and adapted from p
 ### Innovation Feature A: Embedding-Based Similar-Case Retrieval (CBR Engine)
 
 * **Theoretical Inspiration:** Inspired by **Siamese networks** and deep metric learning (traditionally deployed in facial verification and one-shot matching), this feature repurposes deep latent representations for clinical case comparison.
-* **Implementation:** We tap the penultimate dense representation layer ($D = 256$) immediately prior to the 5-class softmax output layer. For all training samples, 256-dimensional feature vectors are extracted and $L_2$-normalized such that Euclidean distance is strictly monotonic with cosine distance:
+* **Implementation:** We tap the penultimate dense representation layer ($D = 256$) immediately prior to the 5-class softmax output layer. When a verified reference image library is available, 256-dimensional feature vectors are extracted and $L_2$-normalized such that Euclidean distance is strictly monotonic with cosine distance:
   $$\text{Cosine Similarity}(u, v) = \frac{u \cdot v}{\|u\|_2 \|v\|_2} = u \cdot v \quad (\text{for } \|u\|_2 = \|v\|_2 = 1)$$
-* **Clinical Rationale:** Medical practitioners rarely rely on an isolated probabilistic number. In ophthalmic practice, clinicians reason by **analogy to definitive historical cases** (Case-Based Reasoning). By returning the top-3 nearest confirmed historical cases with their verified clinical diagnoses, the system offers **inter-case comparative explainability**, directly complementing the **intra-image spatial explainability** provided by Grad-CAM.
+* **Clinical Rationale:** Medical practitioners rarely rely on an isolated probabilistic number. In ophthalmic practice, clinicians reason by **analogy to definitive historical cases** (Case-Based Reasoning). When the reference library is verified, returning the top-3 nearest cases with their labels offers **inter-case comparative explainability**, complementing the **intra-image spatial explainability** provided by Grad-CAM.
 
 ### Innovation Feature B: Multi-Agent Clinical Decision Pipeline & Safety Governance
 
