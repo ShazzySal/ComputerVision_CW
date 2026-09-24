@@ -664,7 +664,9 @@ def respond_to_clinical_query(message: str, history: List) -> tuple:
         if any(kw in query for kw in entry["keys"]):
             reply = entry["reply"]
             break
-    history = history + [[message, reply]]
+    history.append({"role": "user", "content": message})
+    history.append({"role": "assistant", "content": reply})
+    return history, ""
 def calculate_multimodal_risk(stage: int = 2, hba1c: float = 7.5, duration_years: float = 10.0, age: float = 55.0, systolic_bp: float = 135.0, diabetes_type: str = "Type 2") -> Tuple[str, str]:
     """Computes evidence-based 10-year vision loss progression risk and NHS hospital triage dispatch routing (UKPDS/WESDR)."""
     try:
