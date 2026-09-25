@@ -2191,100 +2191,95 @@ HEAD_SCRIPT = """
 <script>
 (function() {
     window.retinaOpenTab = function(label, btnEl, elemId) {
+        const cleanLabel = (label || '').toLowerCase().trim();
 
         function getAllRoots() {
             const roots = [document];
             const app = document.querySelector('gradio-app');
-            if (app) { roots.push(app); if (app.shadowRoot) roots.push(app.shadowRoot); }
-            // also walk any nested shadow roots
-            function collectShadows(node) {
-                if (!node) return;
-                if (node.shadowRoot) roots.push(node.shadowRoot);
-                (node.children ? Array.from(node.children) : []).forEach(collectShadows);
+            if (app) {
+                roots.push(app);
+                if (app.shadowRoot) roots.push(app.shadowRoot);
+                function collectShadows(node) {
+                    if (!node) return;
+                    if (node.shadowRoot) roots.push(node.shadowRoot);
+                    const kids = node.children ? Array.from(node.children) : [];
+                    for (let i = 0; i < kids.length; i++) {
+                        collectShadows(kids[i]);
+                    }
+                }
+                collectShadows(app);
             }
-            if (app) collectShadows(app);
             return roots;
         }
 
         function findTabButton() {
             const roots = getAllRoots();
 
-            // Strategy 1: find the tabpanel by elem_id, then find its matching tab button
-            // Gradio sets the elem_id on the tabpanel wrapper div. The corresponding
-            // button in the tab nav has aria-controls pointing to the panel id, OR
-            // they share a positional index inside the same tabs parent.
-            if (elemId) {
-                for (const r of roots) {
-                    // Try to find the panel by ID (gradio may append --panel or similar)
-                    const panelSelectors = [
-                        `#${elemId}`,
-                        `[id="${elemId}"]`,
-                        `[id^="${elemId}"]`,
-                    ];
-                    for (const sel of panelSelectors) {
-                        let panel;
-                        try { panel = r.querySelector(sel); } catch(e) {}
-                        if (!panel) continue;
-
-                        // Find the tablist that owns this panel
-                        let tabsParent = panel.parentElement;
-                        while (tabsParent && !tabsParent.querySelector('[role="tab"], .tab-nav button')) {
-                            tabsParent = tabsParent.parentElement;
+            // Strategy 1: Find tab button by text match (excluding sidebar buttons)
+            if (cleanLabel) {
+                for (let i = 0; i < roots.length; i++) {
+                    const r = roots[i];
+                    let buttons = [];
+                    try {
+                        buttons = Array.from(r.querySelectorAll('button, [role="tab"]'));
+                    } catch(e) {}
+                    for (let j = 0; j < buttons.length; j++) {
+                        const btn = buttons[j];
+                        if (btn.closest && btn.closest('#rg-sidebar')) continue;
+                        const txt = (btn.textContent || '').toLowerCase();
+                        if (txt.includes(cleanLabel)) {
+                            return btn;
                         }
-                        if (!tabsParent) continue;
-
-                        // Try aria-controls match first
-                        const panelId = panel.id || panel.getAttribute('id');
-                        if (panelId) {
-                            const byAria = tabsParent.querySelector(`[aria-controls="${panelId}"]`);
-                            if (byAria) return byAria;
-                        }
-
-                        // Try positional index: find panel's index among sibling panels, match to tab button
-                        const allPanels = Array.from(tabsParent.querySelectorAll('[role="tabpanel"], .tabitem'));
-                        const allButtons = Array.from(tabsParent.querySelectorAll('[role="tab"], .tab-nav button, button[id]'))
-                            .filter(b => !b.closest('#rg-sidebar'));
-                        const idx = allPanels.indexOf(panel);
-                        if (idx >= 0 && allButtons[idx]) return allButtons[idx];
                     }
                 }
             }
 
-            // Strategy 2: text match on tab buttons (not sidebar buttons)
-            const cleanLabel = (label || '').toLowerCase().trim();
-            if (cleanLabel) {
-                const roots2 = getAllRoots();
-                for (const r of roots2) {
-                    let candidates;
+            // Strategy 2: Find panel by elemId, then get corresponding tab button
+            if (elemId) {
+                for (let i = 0; i < roots.length; i++) {
+                    const r = roots[i];
+                    let panel = null;
                     try {
-                        candidates = Array.from(r.querySelectorAll('[role="tab"], .tab-nav button, button.selected, .tabs button'));
-                    } catch(e) { candidates = []; }
-                    for (const c of candidates) {
-                        if (c.closest && c.closest('#rg-sidebar')) continue;
-                        const txt = (c.textContent || '').toLowerCase().replace(/[ \t\r\n]+/g, ' ').trim();
-                        if (txt.includes(cleanLabel)) return c;
-                    }
-                }
+                        panel = r.getElementById ? r.getElementById(elemId) : r.querySelector('#' + elemId);
+                    } catch(e) {}
+                    if (!panel) continue;
 
-                // Strategy 3: deep recursive search
-                function searchDeep(node) {
-                    if (!node) return null;
-                    if (node.shadowRoot) { const r = searchDeep(node.shadowRoot); if (r) return r; }
-                    const kids = node.children ? Array.from(node.children) : [];
-                    for (const child of kids) {
-                        if ((child.tagName === 'BUTTON' || child.getAttribute('role') === 'tab') &&
-                            !(child.closest && child.closest('#rg-sidebar'))) {
-                            const txt = (child.textContent || '').toLowerCase();
-                            if (txt.includes(cleanLabel)) return child;
-                        }
-                        const r = searchDeep(child);
-                        if (r) return r;
+                    let parent = panel.parentElement;
+                    while (parent && !parent.querySelector('[role="tab"], .tab-nav button')) {
+                        parent = parent.parentElement;
                     }
-                    return null;
+                    if (parent) {
+                        const panelId = panel.id || elemId;
+                        const byAria = parent.querySelector('[aria-controls="' + panelId + '"]');
+                        if (byAria) return byAria;
+
+                        const panels = Array.from(parent.querySelectorAll('[role="tabpanel"], .tabitem'));
+                        const navBtns = Array.from(parent.querySelectorAll('[role="tab"], .tab-nav button'))
+                            .filter(b => !b.closest('#rg-sidebar'));
+                        const pIdx = panels.indexOf(panel);
+                        if (pIdx >= 0 && navBtns[pIdx]) return navBtns[pIdx];
+                    }
                 }
-                const app = document.querySelector('gradio-app');
-                const deep = searchDeep(app) || searchDeep(document.body);
-                if (deep) return deep;
+            }
+
+            // Strategy 3: Loose word matching (e.g. "chatbot", "cbr", "triage", "diag")
+            if (cleanLabel) {
+                const words = cleanLabel.split(' ').filter(w => w.length > 2);
+                for (let i = 0; i < roots.length; i++) {
+                    const r = roots[i];
+                    let buttons = [];
+                    try {
+                        buttons = Array.from(r.querySelectorAll('button, [role="tab"]'));
+                    } catch(e) {}
+                    for (let j = 0; j < buttons.length; j++) {
+                        const btn = buttons[j];
+                        if (btn.closest && btn.closest('#rg-sidebar')) continue;
+                        const txt = (btn.textContent || '').toLowerCase();
+                        if (words.some(w => txt.includes(w))) {
+                            return btn;
+                        }
+                    }
+                }
             }
 
             return null;
@@ -2293,44 +2288,36 @@ HEAD_SCRIPT = """
         const target = findTabButton();
         if (target) {
             target.click();
-            try { target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true })); } catch(e) {}
-            setTimeout(() => { try { target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch(e) {} }, 60);
+            try {
+                target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
+            } catch(e) {}
+            setTimeout(function() {
+                try { target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch(e) {}
+            }, 50);
         } else {
             console.warn('[RetinaTrace] Tab target not found for:', label, elemId);
+            setTimeout(function() {
+                const retryTarget = findTabButton();
+                if (retryTarget) {
+                    retryTarget.click();
+                    try {
+                        retryTarget.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
+                    } catch(e) {}
+                }
+            }, 250);
         }
 
         if (btnEl) {
-            document.querySelectorAll('#rg-sidebar .rg-sb-btn').forEach(b => b.classList.remove('rg-active'));
+            document.querySelectorAll('#rg-sidebar .rg-sb-btn').forEach(function(b) {
+                b.classList.remove('rg-active');
+            });
             btnEl.classList.add('rg-active');
         }
 
-        // On mobile/tablet, close drawer upon tab navigation
+        // On mobile, close drawer
         if (window.innerWidth <= 900 && window.retinaToggleSidebar) {
             window.retinaToggleSidebar(false);
         }
-    };
-
-    // Wrap retinaOpenTab with retry logic for lazy Gradio renders
-    const _origOpenTab = window.retinaOpenTab;
-    window.retinaOpenTab = function(label, btnEl, elemId) {
-        _origOpenTab(label, btnEl, elemId);
-        // If target wasn't found (tab may not be rendered yet), retry after short delays
-        setTimeout(() => {
-            const roots = [document];
-            const app = document.querySelector('gradio-app');
-            if (app) { roots.push(app); if (app.shadowRoot) roots.push(app.shadowRoot); }
-            const cleanLabel = (label || '').toLowerCase().trim();
-            const found = roots.some(r => {
-                try {
-                    return Array.from(r.querySelectorAll('[role="tab"], .tab-nav button, .tabs button'))
-                        .some(b => !b.closest('#rg-sidebar') && (b.textContent||'').toLowerCase().includes(cleanLabel));
-                } catch(e) { return false; }
-            });
-            if (!found) {
-                // Try again after Gradio finishes rendering
-                setTimeout(() => _origOpenTab(label, btnEl, elemId), 400);
-            }
-        }, 150);
     };
 
     window.retinaToggleSidebar = function(open) {
@@ -2357,10 +2344,10 @@ HEAD_SCRIPT = """
         if (elApp) targets.push(elApp);
         
         if (isDark) {
-            targets.forEach(t => t.classList.remove('dark'));
+            targets.forEach(function(t) { t.classList.remove('dark'); });
             try { localStorage.setItem('retinaguard_theme', 'light'); } catch(e) {}
         } else {
-            targets.forEach(t => t.classList.add('dark'));
+            targets.forEach(function(t) { t.classList.add('dark'); });
             try { localStorage.setItem('retinaguard_theme', 'dark'); } catch(e) {}
         }
     };
@@ -2378,7 +2365,9 @@ HEAD_SCRIPT = """
             { text: 'Image Comparison', match: ['report', 'json', 'download', 'compare', 'graham', 'preproc'] },
             { text: 'Longitudinal Analysis', match: ['longitudinal', 'previous', 'current', 'delta', 'progression'] }
         ];
-        const found = tabs.find(t => t.match.some(m => q.includes(m)));
+        const found = tabs.find(function(t) {
+            return t.match.some(function(m) { return q.includes(m); });
+        });
         if (found) {
             window.retinaOpenTab(found.text);
         }
@@ -2409,7 +2398,6 @@ HEAD_SCRIPT = """
         if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
             document.documentElement.classList.add('dark');
             document.body.classList.add('dark');
-            const elApp = document.querySelector('gradio-app');
         }
     } catch(e) {}
 })();
