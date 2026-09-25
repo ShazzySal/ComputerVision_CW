@@ -2151,7 +2151,7 @@ def open_tab_js(label: str) -> str:
 
 theme = gr.themes.Soft(primary_hue="teal", secondary_hue="slate")
 
-with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
+with gr.Blocks(title="Retinova AI — Clinical Decision Intelligence") as demo:
     # Inject Custom Clinical Styling & Theme Detection
     gr.HTML(CUSTOM_CSS)
 
@@ -2162,8 +2162,8 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
         <div class="rg-sb-logo">
             <div class="rg-sb-logo-icon">👁️</div>
             <div>
-                <div class="rg-sb-logo-text">RetinaGuard AI</div>
-                <div class="rg-sb-logo-sub">Clinical Decision Support</div>
+                <div class="rg-sb-logo-text">Retinova AI</div>
+                <div class="rg-sb-logo-sub">Clinical Intelligence</div>
             </div>
         </div>
 
@@ -2250,20 +2250,22 @@ with gr.Blocks(title="RetinaGuard AI — Diabetic Retinopathy CDS") as demo:
 
     # ── Top Title Strip ──────
     gr.HTML("""
-    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid rgba(226,232,240,0.6);">
-        <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:22px;">👁️</span>
-            <div>
-                <div class="header-title" style="font-size:18px; font-weight:800; letter-spacing:-0.3px; margin:0; line-height:1.1;">
-                    RetinaGuard AI <span style="color:#0d9488; font-weight:600;">Clinical Decision Support</span>
-                </div>
-                <div class="header-subtitle" style="font-size:11px; margin:0; color:#64748b;">
-                    Multi-Stage Diabetic Retinopathy Pipeline &bull; BSc (Hons) Computer Science
-                </div>
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(226,232,240,0.5);">
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg, #0d9488, #2563eb); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(13,148,136,0.3); font-size:18px;">
+                👁️
+            </div>
+            <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap;">
+                <span class="header-title" style="font-size:20px; font-weight:800; letter-spacing:-0.4px; margin:0; line-height:1;">
+                    Retinova AI
+                </span>
+                <span style="font-size:12px; font-weight:700; color:#0d9488; background:rgba(13,148,136,0.12); border:1px solid rgba(13,148,136,0.28); padding:3px 9px; border-radius:6px; letter-spacing:0.3px; text-transform:uppercase;">
+                    Clinical Intelligence
+                </span>
             </div>
         </div>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span style="background:#e0f2fe; color:#0369a1; padding:3px 9px; border-radius:6px; font-weight:700; font-size:11px; white-space:nowrap;">
+            <span style="background:#e0f2fe; color:#0369a1; padding:4px 10px; border-radius:6px; font-weight:700; font-size:11px; white-space:nowrap;">
                 EfficientNetB3 &bull; Grad-CAM &bull; U-Net &bull; CBR
             </span>
         </div>
