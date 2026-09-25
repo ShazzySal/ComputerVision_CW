@@ -1895,8 +1895,115 @@ gradio-app {
     box-shadow: 0 8px 26px rgba(13, 148, 136, 0.6) !important;
 }
 
-/* Push main Gradio container right to make room for sidebar - ZERO horizontal scroll */
+/* Mobile hamburger button */
+#rg-mobile-menu-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #38bdf8;
+    font-size: 19px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 0;
+    line-height: 1;
+}
+#rg-mobile-menu-btn:hover {
+    background: #1e293b;
+    border-color: #38bdf8;
+}
+.dark #rg-mobile-menu-btn {
+    background: #0b1329;
+    border-color: #1e293b;
+    color: #2dd4bf;
+}
+@media (max-width: 900px) {
+    #rg-mobile-menu-btn {
+        display: flex !important;
+    }
+}
+
+/* Sidebar backdrop on mobile */
+#rg-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(11, 19, 41, 0.7);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 9998;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+#rg-sidebar-backdrop.rg-open {
+    display: block !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* Sidebar close button */
+.rg-sb-close-btn {
+    display: none;
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px;
+    border-radius: 6px;
+    z-index: 10;
+}
+.rg-sb-close-btn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+}
+@media (max-width: 900px) {
+    .rg-sb-close-btn {
+        display: block !important;
+    }
+}
+
+/* Quick samples row: perfectly balanced horizontal row */
+.quick-samples-row {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    margin-top: 4px !important;
+    margin-bottom: 8px !important;
+}
+.quick-samples-row > div {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+}
+.quick-samples-row button {
+    width: 100% !important;
+    padding: 7px 4px !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+/* Push main Gradio container right on desktop - Responsive drawer on mobile */
 @media (min-width: 901px) {
+    #rg-sidebar {
+        transform: translateX(0) !important;
+        width: 240px !important;
+    }
     .gradio-container {
         margin-left: 240px !important;
         margin-right: 0 !important;
@@ -1909,35 +2016,50 @@ gradio-app {
 }
 @media (max-width: 900px) {
     #rg-sidebar {
-        width: 62px !important;
+        display: flex !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        width: 270px !important;
+        transform: translateX(-100%) !important;
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        z-index: 9999 !important;
+        box-shadow: none !important;
+    }
+    #rg-sidebar.rg-open {
+        transform: translateX(0) !important;
+        box-shadow: 6px 0 35px rgba(0, 0, 0, 0.75) !important;
     }
     #rg-sidebar .rg-sb-logo-text,
     #rg-sidebar .rg-sb-logo-sub,
     #rg-sidebar .rg-sb-search-wrap,
     #rg-sidebar .rg-sb-section-label,
     #rg-sidebar .rg-sb-nav button span:not(.rg-sb-icon),
-    #rg-badge,
     #rg-sidebar .rg-badge,
     #rg-sidebar .rg-sb-telemetry,
     #rg-sidebar .rg-sb-footer button span:last-child {
-        display: none !important;
+        display: block !important;
     }
     #rg-sidebar .rg-sb-nav button {
-        justify-content: center !important;
-        padding: 10px !important;
+        justify-content: flex-start !important;
+        padding: 9px 12px !important;
     }
     .gradio-container {
-        margin-left: 62px !important;
+        margin-left: 0 !important;
         margin-right: 0 !important;
-        width: calc(100% - 62px) !important;
-        max-width: calc(100% - 62px) !important;
+        width: 100% !important;
+        max-width: 100% !important;
         padding-left: 12px !important;
-        padding-right: 14px !important;
+        padding-right: 12px !important;
         box-sizing: border-box !important;
     }
 }
 @media (max-width: 600px) {
-    #rg-sidebar { display: none !important; }
+    #rg-sidebar {
+        display: flex !important;
+        width: 270px !important;
+    }
     .gradio-container {
         margin-left: 0 !important;
         margin-right: 0 !important;
@@ -2038,6 +2160,26 @@ HEAD_SCRIPT = """
             document.querySelectorAll('#rg-sidebar .rg-sb-btn').forEach(b => b.classList.remove('rg-active'));
             btnEl.classList.add('rg-active');
         }
+
+        // On mobile/tablet, close drawer upon tab navigation
+        if (window.innerWidth <= 900 && window.retinaToggleSidebar) {
+            window.retinaToggleSidebar(false);
+        }
+    };
+
+    window.retinaToggleSidebar = function(open) {
+        const sb = document.getElementById('rg-sidebar');
+        const bd = document.getElementById('rg-sidebar-backdrop');
+        if (!sb) return;
+        const isCurrentlyOpen = sb.classList.contains('rg-open');
+        const shouldOpen = open === undefined ? !isCurrentlyOpen : Boolean(open);
+        if (shouldOpen) {
+            sb.classList.add('rg-open');
+            if (bd) bd.classList.add('rg-open');
+        } else {
+            sb.classList.remove('rg-open');
+            if (bd) bd.classList.remove('rg-open');
+        }
     };
 
     window.retinaToggleTheme = function() {
@@ -2078,8 +2220,12 @@ HEAD_SCRIPT = """
 
     function mountSidebar() {
         const sb = document.getElementById('rg-sidebar');
+        const bd = document.getElementById('rg-sidebar-backdrop');
         if (sb && sb.parentElement && sb.parentElement !== document.body) {
             document.body.appendChild(sb);
+        }
+        if (bd && bd.parentElement && bd.parentElement !== document.body) {
+            document.body.appendChild(bd);
         }
     }
     if (document.readyState === 'loading') {
@@ -2157,7 +2303,11 @@ with gr.Blocks(title="Retinova AI — Clinical Decision Intelligence") as demo:
 
     # ── Sidebar (injected as fixed HTML, JS drives tab navigation) ───
     gr.HTML("""
+    <div id="rg-sidebar-backdrop" onclick="window.retinaToggleSidebar(false)"></div>
     <div id="rg-sidebar">
+        <!-- Mobile close button -->
+        <button class="rg-sb-close-btn" onclick="window.retinaToggleSidebar(false)" title="Close Navigation">&times;</button>
+
         <!-- Logo -->
         <div class="rg-sb-logo">
             <div class="rg-sb-logo-icon">👁️</div>
@@ -2251,7 +2401,11 @@ with gr.Blocks(title="Retinova AI — Clinical Decision Intelligence") as demo:
     # ── Top Title Strip ──────
     gr.HTML("""
     <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(226,232,240,0.5);">
-        <div style="display:flex; align-items:center; gap:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <!-- Mobile Menu Drawer Toggle (<= 900px) -->
+            <button id="rg-mobile-menu-btn" onclick="window.retinaToggleSidebar(true)" title="Open Navigation Menu">
+                <span>☰</span>
+            </button>
             <div style="width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg, #0d9488, #2563eb); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(13,148,136,0.3); font-size:18px;">
                 👁️
             </div>
@@ -2278,16 +2432,17 @@ with gr.Blocks(title="Retinova AI — Clinical Decision Intelligence") as demo:
         with gr.Column(scale=4):
             input_image = gr.Image(label="📥 Upload Fundus Photo", type="numpy", height=210)
 
-            # Quick Preset Buttons
-            with gr.Row():
-                btn_normal = gr.Button("🟢 Normal", size="sm")
-                btn_moderate = gr.Button("🟡 Moderate", size="sm")
-                btn_prolif = gr.Button("🔴 Proliferative", size="sm")
-
-            # ── Run button immediately after upload (always visible) ──────────
+            # ── Run & Reset buttons DIRECTLY under upload section ───────────
             with gr.Row():
                 submit_btn = gr.Button("🚀 Run Diagnostic Analysis", variant="primary", size="lg", scale=3, elem_classes=["action-btn"])
                 btn_clear = gr.Button("🔄 Reset", variant="secondary", size="lg", scale=1)
+
+            # Quick Preset Buttons (Single balanced row)
+            gr.Markdown("<div style='font-size:11px; font-weight:700; color:#64748b; margin:6px 0 2px 0;'>⚡ QUICK-LOAD SAMPLES:</div>")
+            with gr.Row(elem_classes=["quick-samples-row"]):
+                btn_normal = gr.Button("🟢 Normal", size="sm")
+                btn_moderate = gr.Button("🟡 Moderate", size="sm")
+                btn_prolif = gr.Button("🔴 Proliferative", size="sm")
 
             with gr.Accordion("🛡️ Safety gate & patient context", open=False):
                 threshold_slider = gr.Slider(
@@ -2308,8 +2463,8 @@ with gr.Blocks(title="Retinova AI — Clinical Decision Intelligence") as demo:
 
         # Right Column: Multi-Tab Clinical Dossier
         with gr.Column(scale=6):
-            # Governance Status Banner (Appears at the very top of results)
-            status_banner = gr.HTML("<div class='card'><em>Upload a retinal fundus photograph or click a quick-load sample to begin.</em></div>")
+            # Governance Status Banner (Appears at top of results when analysis runs)
+            status_banner = gr.HTML("")
 
             # Structured Tabs
             with gr.Tabs():
