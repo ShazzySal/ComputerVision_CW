@@ -1,5 +1,5 @@
 """
-app.py — RetinaGuard AI: Multi-Agent Clinical Decision Support System
+app.py — RetinaTrace AI: Multi-Agent Clinical Decision Support System
 Modern, Unique & User-Friendly Gradio Web Application.
 
 BSc (Hons) Computer Science — Computer Vision (BSCCOMP24.2P)
@@ -104,7 +104,7 @@ _CLINICAL_KB: List[Dict[str, Any]] = [
         "keys": ["efficientnet", "backbone", "architecture", "model", "network", "cnn"],
         "reply": (
             "**EfficientNetB3 — Deep Learning Backbone**\n\n"
-            "RetinaGuard uses **EfficientNetB3** pre-trained on ImageNet as its convolutional "
+            "RetinaTrace uses **EfficientNetB3** pre-trained on ImageNet as its convolutional "
             "backbone. EfficientNet applies **compound scaling** — simultaneously scaling "
             "depth, width, and resolution using a fixed ratio — achieving superior "
             "accuracy/parameter efficiency vs ResNet, DenseNet, or VGG.\n\n"
@@ -162,7 +162,7 @@ _CLINICAL_KB: List[Dict[str, Any]] = [
         "keys": ["cbr", "case-based reasoning", "similar cases", "embedding", "retrieval", "nearest neighbor"],
         "reply": (
             "**Case-Based Reasoning (CBR) — Similar Case Retrieval**\n\n"
-            "After diagnosis, RetinaGuard extracts a **256-dimensional feature vector** "
+            "After diagnosis, RetinaTrace extracts a **256-dimensional feature vector** "
             "from the penultimate dense layer (`head_dense`) of the classifier.\n\n"
             "When a verified reference library is available, this embedding is compared "
             "against stored case embeddings in `embeddings.npz` using **cosine similarity**. "
@@ -194,7 +194,7 @@ _CLINICAL_KB: List[Dict[str, Any]] = [
             "QWK assigns **quadratic penalty weights** proportional to the distance between "
             "the predicted and true stage. A kappa of 1.0 = perfect agreement; "
             "0.0 = chance agreement; <0 = worse than chance.\n\n"
-            "RetinaGuard achieves a QWK of ~0.842, indicating substantial clinical agreement."
+            "RetinaTrace achieves a QWK of ~0.842, indicating substantial clinical agreement."
         ),
     },
     {
@@ -216,7 +216,7 @@ _CLINICAL_KB: List[Dict[str, Any]] = [
         "keys": ["dataset", "data", "kaggle", "aptos", "idrid", "messidor", "eyepacs", "38034", "38,034"],
         "reply": (
             "**Dataset — 38,034-Image Multi-Source Fundus Cohort**\n\n"
-            "RetinaGuard is trained on the **Combined DR Dataset** (Harsha, 2020) from Kaggle, "
+            "RetinaTrace is trained on the **Combined DR Dataset** (Harsha, 2020) from Kaggle, "
             "pooling four internationally recognized ophthalmic cohorts:\n\n"
             "1. **APTOS 2019:** Rural Indian clinic screening, multi-camera variability.\n"
             "2. **IDRiD:** Gold-standard Indian clinical staging with sub-lesion verification.\n"
@@ -303,9 +303,9 @@ def generate_report_json(stage_name: str, confidence: float, probabilities: dict
     if not stage_name or not probabilities or not ehr_text:
         return None
     report = {
-        "retinaguard_report": {
+        "retinatrace_report": {
             "generated_at": _datetime.datetime.now().isoformat(),
-            "model": "EfficientNetB3 + U-Net + CBR (RetinaGuard AI)",
+            "model": "EfficientNetB3 + U-Net + CBR (RetinaTrace AI)",
             "diagnosis": {
                 "stage_name": stage_name,
                 "confidence_pct": round(confidence * 100, 2),
@@ -1705,17 +1705,24 @@ gradio-app {
 #rg-sidebar .rg-sb-logo-icon {
     width: 38px !important;
     height: 38px !important;
-    background: linear-gradient(135deg, #0d9488, #0284c7) !important;
+    background: rgba(46, 125, 50, 0.16) !important;
+    border: 1px solid rgba(74, 222, 128, 0.32) !important;
     border-radius: 10px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 20px !important;
+    padding: 3px !important;
     flex-shrink: 0 !important;
-    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(46, 125, 50, 0.25) !important;
+}
+#rg-sidebar .rg-sb-logo-icon .rt-logo-img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    filter: drop-shadow(0 0 5px rgba(74, 222, 128, 0.5)) brightness(1.2) contrast(1.1) !important;
 }
 #rg-sidebar .rg-sb-logo-text {
-    font-size: 14px !important;
+    font-size: 15px !important;
     font-weight: 800 !important;
     color: #f8fafc !important;
     line-height: 1.2 !important;
@@ -1723,9 +1730,46 @@ gradio-app {
 }
 #rg-sidebar .rg-sb-logo-sub {
     font-size: 10.5px !important;
-    color: #38bdf8 !important;
+    color: #86efac !important;
     font-weight: 600 !important;
     letter-spacing: 0.3px !important;
+}
+.rt-logo-badge {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 10px !important;
+    background: #f0fdf4 !important;
+    border: 1px solid #bbf7d0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 4px !important;
+    box-shadow: 0 2px 6px rgba(46, 125, 50, 0.12) !important;
+    flex-shrink: 0 !important;
+}
+.rt-logo-badge .rt-logo-img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+}
+.dark .rt-logo-badge {
+    background: rgba(46, 125, 50, 0.22) !important;
+    border-color: rgba(74, 222, 128, 0.35) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+}
+.dark .rt-logo-badge .rt-logo-img {
+    filter: drop-shadow(0 0 5px rgba(74, 222, 128, 0.45)) brightness(1.22) contrast(1.1) !important;
+}
+.dark .header-title {
+    color: #f8fafc !important;
+}
+.dark .header-title span {
+    color: #4ade80 !important;
+}
+.dark .rt-badge-pill {
+    color: #4ade80 !important;
+    background: rgba(74, 222, 128, 0.15) !important;
+    border-color: rgba(74, 222, 128, 0.35) !important;
 }
 #rg-sidebar .rg-sb-search-wrap {
     padding: 12px 14px 6px !important;
@@ -2153,7 +2197,7 @@ HEAD_SCRIPT = """
                 try { target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch(e) {}
             }, 60);
         } else {
-            console.warn('[RetinaGuard] Tab target not found for:', label, elemId);
+            console.warn('[RetinaTrace] Tab target not found for:', label, elemId);
         }
 
         if (btnEl) {
@@ -2294,10 +2338,21 @@ def open_tab_js(label: str) -> str:
             window.retinaOpenTab('{escaped_label}');
         }}
     }}"""
+    
+# RetinaTrace Brand Assets
+_LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "retinatrace_icon.png")
+if os.path.exists(_LOGO_PATH):
+    import base64 as _base64
+    with open(_LOGO_PATH, "rb") as _f:
+        RETINA_LOGO_SRC = f"data:image/png;base64,{_base64.b64encode(_f.read()).decode('ascii')}"
+else:
+    RETINA_LOGO_SRC = ""
+
+RETINA_LOGO_IMG = f'<img src="{RETINA_LOGO_SRC}" alt="RetinaTrace" class="rt-logo-img" />' if RETINA_LOGO_SRC else """<svg viewBox="0 0 112 65" fill="#2e7d32" class="rt-logo-img"><path d="M 52 19 L 50 20 L 46 24 L 44 29 L 44 34 L 46 38 L 49 41 L 53 43 L 58 43 L 64 40 L 66 37 L 67 34 L 67 29 L 65 25 L 61 26 L 60 22 L 63 21 L 61 19 Z M 0 30 L 1 34 L 15 48 L 23 54 L 37 61 L 49 64 L 60 64 L 66 63 L 76 60 L 86 55 L 97 47 L 110 34 L 111 32 L 111 30 L 100 19 L 88 10 L 78 5 L 69 2 L 56 0 L 42 2 L 28 7 L 14 16 Z M 50 15 L 59 15 L 64 19 L 67 20 L 70 17 L 72 19 L 75 26 L 75 37 L 73 41 L 65 49 L 60 51 L 50 51 L 46 49 L 40 44 L 36 37 L 36 27 L 44 18 Z M 75 10 L 83 14 L 92 20 L 103 32 L 92 43 L 87 47 L 75 54 L 72 53 L 78 45 L 81 37 L 81 25 L 78 18 L 73 12 Z M 33 11 L 37 11 L 33 16 L 30 24 L 30 38 L 34 46 L 44 55 L 41 56 L 30 51 L 20 44 L 7 31 L 21 18 Z"/></svg>"""
 
 theme = gr.themes.Soft(primary_hue="teal", secondary_hue="slate")
 
-with gr.Blocks(title="Retinova AI — Clinical Decision Intelligence") as demo:
+with gr.Blocks(title="RetinaTrace — Clinical Retinal Intelligence") as demo:
     # Inject Custom Clinical Styling & Theme Detection
     gr.HTML(CUSTOM_CSS)
 
@@ -2310,9 +2365,11 @@ with gr.Blocks(title="Retinova AI — Clinical Decision Intelligence") as demo:
 
         <!-- Logo -->
         <div class="rg-sb-logo">
-            <div class="rg-sb-logo-icon">👁️</div>
+            <div class="rg-sb-logo-icon">
+                """ + RETINA_LOGO_IMG + """
+            </div>
             <div>
-                <div class="rg-sb-logo-text">Retinova AI</div>
+                <div class="rg-sb-logo-text">Retina<span style="color:#4ade80;">Trace</span></div>
                 <div class="rg-sb-logo-sub">Clinical Intelligence</div>
             </div>
         </div>
@@ -2399,22 +2456,22 @@ with gr.Blocks(title="Retinova AI — Clinical Decision Intelligence") as demo:
     _diag_plan_state = gr.State("")
 
     # ── Top Title Strip ──────
-    gr.HTML("""
+    gr.HTML(f"""
     <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(226,232,240,0.5);">
         <div style="display:flex; align-items:center; gap:10px;">
             <!-- Mobile Menu Drawer Toggle (<= 900px) -->
             <button id="rg-mobile-menu-btn" onclick="window.retinaToggleSidebar(true)" title="Open Navigation Menu">
                 <span>☰</span>
             </button>
-            <div style="width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg, #0d9488, #2563eb); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(13,148,136,0.3); font-size:18px;">
-                👁️
+            <div class="rt-logo-badge">
+                {RETINA_LOGO_IMG}
             </div>
             <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap;">
-                <span class="header-title" style="font-size:20px; font-weight:800; letter-spacing:-0.4px; margin:0; line-height:1;">
-                    Retinova AI
+                <span class="header-title" style="font-size:22px; font-weight:800; letter-spacing:-0.4px; margin:0; line-height:1;">
+                    Retina<span style="color:#2e7d32;">Trace</span>
                 </span>
-                <span style="font-size:12px; font-weight:700; color:#0d9488; background:rgba(13,148,136,0.12); border:1px solid rgba(13,148,136,0.28); padding:3px 9px; border-radius:6px; letter-spacing:0.3px; text-transform:uppercase;">
-                    Clinical Intelligence
+                <span class="rt-badge-pill" style="font-size:12px; font-weight:700; color:#2e7d32; background:rgba(46,125,50,0.12); border:1px solid rgba(46,125,50,0.28); padding:3px 9px; border-radius:6px; letter-spacing:0.3px; text-transform:uppercase;">
+                    Clinical AI
                 </span>
             </div>
         </div>
