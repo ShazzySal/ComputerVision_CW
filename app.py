@@ -647,7 +647,7 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float, session_history:
     diag = result["diagnosis"]
     expl = result["explanation"]
     adv = result["advisory"]
-    flagged = result["flagged"]
+    flagged = result["flagged_for_review"]
     stage = diag["stage"]
     overlap = expl.get("overlap_analysis", {})
     severity_map = expl.get("severity_map", {})
@@ -1418,16 +1418,80 @@ gradio-app {
 /* Keep the first viewport focused on the primary action and prediction. */
 .gradio-container .gr-accordion {
     border-radius: 8px !important;
-    margin-bottom: 8px !important;
+    margin-bottom: 6px !important;
 }
 .gradio-container .gr-accordion > .label-wrap {
-    padding: 9px 12px !important;
+    padding: 8px 12px !important;
 }
 .gradio-container .tabs {
-    margin-top: 8px !important;
+    margin-top: 4px !important;
 }
 .gradio-container .tabitem {
-    padding-top: 10px !important;
+    padding-top: 6px !important;
+}
+
+/* ── Global padding compression ── */
+/* Reduce the default Gradio page-level top/bottom padding */
+.gradio-container {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+}
+/* Tighten row & column gaps */
+.gradio-container .gap {
+    gap: 8px !important;
+}
+/* Shrink individual form-block vertical margins */
+.gradio-container .block,
+.gradio-container .form,
+.gradio-container .gap > * {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+/* Image upload widget label/label-wrap */
+.gradio-container .block label,
+.gradio-container .block .label-wrap {
+    margin-bottom: 2px !important;
+}
+/* Reduce space between the uploader and the Run button row */
+.gradio-container .row {
+    gap: 6px !important;
+}
+/* Card spacing */
+.card {
+    margin-bottom: 8px !important;
+}
+
+/* ── Aggressive Gradio internal spacing overrides ── */
+/* Remove top padding on the main app wrapper */
+.gradio-container > .main,
+.gradio-container > .main > .wrap {
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+    gap: 8px !important;
+}
+/* Shrink Gradio svelte block wrapper padding */
+.svelte-1gfkn6j,
+[class*="wrap "] {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+/* Tighten Gradio built-in form block top/bottom padding */
+.form > div,
+.form > .block {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+}
+/* Force image block not to add extra margin */
+.gradio-container .image-frame {
+    margin: 0 !important;
+}
+/* Shrink button groups internal margin */
+.gradio-container button + button {
+    margin-left: 4px !important;
+}
+/* Tighten inter-element gap inside each column */
+.gradio-container > .main > .wrap > .contain > * + * {
+    margin-top: 6px !important;
 }
 
 /* Keep dense result cards usable on phones and small tablet widths. */
@@ -2025,8 +2089,8 @@ gradio-app {
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     gap: 6px !important;
-    margin-top: 4px !important;
-    margin-bottom: 8px !important;
+    margin-top: 2px !important;
+    margin-bottom: 4px !important;
 }
 .quick-samples-row > div {
     flex: 1 1 0 !important;
@@ -2457,7 +2521,7 @@ with gr.Blocks(title="RetinaTrace — Clinical Retinal Intelligence") as demo:
 
     # ── Top Title Strip ──────
     gr.HTML(f"""
-    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(226,232,240,0.5);">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:6px; padding-bottom:6px; border-bottom:1px solid rgba(226,232,240,0.5);">
         <div style="display:flex; align-items:center; gap:10px;">
             <!-- Mobile Menu Drawer Toggle (<= 900px) -->
             <button id="rg-mobile-menu-btn" onclick="window.retinaToggleSidebar(true)" title="Open Navigation Menu">
@@ -2487,7 +2551,7 @@ with gr.Blocks(title="RetinaTrace — Clinical Retinal Intelligence") as demo:
     with gr.Row():
         # Left Column: Upload & Governance Configuration
         with gr.Column(scale=4):
-            input_image = gr.Image(label="📥 Upload Fundus Photo", type="numpy", height=210)
+            input_image = gr.Image(label="📥 Upload Fundus Photo", type="numpy", height=180)
 
             # ── Run & Reset buttons DIRECTLY under upload section ───────────
             with gr.Row():
@@ -2495,7 +2559,7 @@ with gr.Blocks(title="RetinaTrace — Clinical Retinal Intelligence") as demo:
                 btn_clear = gr.Button("🔄 Reset", variant="secondary", size="lg", scale=1)
 
             # Quick Preset Buttons (Single balanced row)
-            gr.Markdown("<div style='font-size:11px; font-weight:700; color:#64748b; margin:6px 0 2px 0;'>⚡ QUICK-LOAD SAMPLES:</div>")
+            gr.Markdown("<div style='font-size:11px; font-weight:700; color:#64748b; margin:3px 0 1px 0;'>⚡ QUICK-LOAD SAMPLES:</div>")
             with gr.Row(elem_classes=["quick-samples-row"]):
                 btn_normal = gr.Button("🟢 Normal", size="sm")
                 btn_moderate = gr.Button("🟡 Moderate", size="sm")
