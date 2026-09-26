@@ -47,17 +47,62 @@ def ben_graham_enhance(img: np.ndarray) -> np.ndarray:
 
 
 def denoise_fundus(img: np.ndarray, diameter: int = 5, sigma_color: float = 20.0, sigma_space: float = 20.0) -> np.ndarray:
-    """Apply conservative edge-preserving denoising before enhancement."""
+    """Apply conservative edge-preserving bilateral filtering before enhancement.
+    
+    Preserves fine retinal vessel boundaries and microaneurysms while smoothing
+    sensor noise and compression artifacts.
+    """
     if img.ndim == 2:
         return cv2.bilateralFilter(img, diameter, sigma_color, sigma_space)
     return cv2.bilateralFilter(img, diameter, sigma_color, sigma_space)
 
 
+def apply_clahe(img: np.ndarray, clip_limit: float = 2.0, tile_grid_size: tuple = (8, 8)) -> np.ndarray:
+    """Apply Contrast-Limited Adaptive Histogram Equalization (CLAHE).
+    
+    For RGB images, operates in the CIELAB color space on the Luminance (L) channel
+    to optimize microvascular contrast without distorting chromatic diagnostic features.
+    For grayscale images, operates directly on the 2D intensity plane.
+    """
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+    if img.ndim == 2:
+        return clahe.apply(img)
+    elif img.ndim == 3 and img.shape[2] == 3:
+        lab = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+        lab[:, :, 0] = clahe.apply(lab[:, :, 0])
+        return cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+    return img
+
+
+def enhance_edges(img: np.ndarray, strength: float = 1.2, sigma: float = 3.0) -> np.ndarray:
+    """Apply high-boost unsharp masking to sharpen microvascular and lesion boundaries.
+    
+    Subtracts a low-pass Gaussian blur to isolate high-frequency edge gradients,
+    enhancing subtle microaneurysms and exudate boundaries against the fundus background.
+    """
+    blurred = cv2.GaussianBlur(img, (0, 0), sigmaX=sigma)
+    sharpened = cv2.addWeighted(img, 1.0 + strength, blurred, -strength, 0)
+    return np.clip(sharpened, 0, 255).astype(np.uint8)
+
+
 def preprocess_image(
     image_input: Union[str, np.ndarray],
     apply_denoise: bool = False,
+    apply_clahe_enhancement: bool = False,
+    apply_edge_enhancement: bool = False,
 ) -> np.ndarray:
-    """Convert an input image into a normalized 224x224 RGB tensor."""
+    """Convert an input image into a normalized 224x224 RGB tensor.
+    
+    Applies the comprehensive medical preprocessing pipeline:
+    1. Color-space standardization (RGBA/Gray -> RGB)
+    2. Circular dark border cropping
+    3. Scale-adaptive interpolation resizing (224x224)
+    4. Optional bilateral edge-preserving denoising
+    5. Optional CLAHE contrast-limited adaptive histogram equalization
+    6. Optional high-boost unsharp mask edge enhancement
+    7. Ben Graham spatial color/illumination normalization
+    8. Intensity normalization to [0.0, 1.0] float32
+    """
     if isinstance(image_input, str):
         bgr = cv2.imread(image_input)
         if bgr is None:
@@ -91,5 +136,9 @@ def preprocess_image(
     resized = cv2.resize(cropped, (AppConfig.IMG_SIZE, AppConfig.IMG_SIZE), interpolation=interp)
     if apply_denoise:
         resized = denoise_fundus(resized)
+    if apply_clahe_enhancement:
+        resized = apply_clahe(resized)
+    if apply_edge_enhancement:
+        resized = enhance_edges(resized)
     enhanced = ben_graham_enhance(resized)
     return enhanced.astype(np.float32) / 255.0

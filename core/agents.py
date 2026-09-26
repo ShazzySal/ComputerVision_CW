@@ -124,7 +124,7 @@ class AdvisoryAgent:
         3: ("Urgent Specialist Evaluation", "Severe NPDR (fulfills '4-2-1 rule'). High progression risk to proliferative retinopathy. Immediate ophthalmologist evaluation required.", "2–4 Weeks"),
         4: ("EMERGENCY Vitreoretinal Intervention", "Proliferative DR (active neovascularization, vitreous hemorrhage). Immediate retina specialist referral for panretinal photocoagulation (PRP) or intravitreal anti-VEGF therapy.", "24–48 Hours"),
     }
-    DISCLAIMER = "CLINICAL DISCLAIMER: RetinaGuard AI is an investigational decision-support tool. It does not replace independent clinical judgment or formal diagnostic verification by a licensed ophthalmologist."
+    DISCLAIMER = "CLINICAL DISCLAIMER: RetinaTrace AI is an investigational decision-support tool. It does not replace independent clinical judgment or formal diagnostic verification by a licensed ophthalmologist."
 
     def process(self, stage: int) -> Dict[str, str]:
         urgency, plan, followup = self.GUIDANCE.get(stage, ("Unknown", "Manual ophthalmological review mandatory.", "Immediate"))

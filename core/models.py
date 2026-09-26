@@ -25,7 +25,7 @@ def build_classifier():
     x = layers.Dense(256, activation="relu", name="head_dense")(x)
     x = layers.Dropout(0.3, name="head_dropout")(x)
     outputs = layers.Dense(AppConfig.NUM_CLASSES, activation="softmax", name="predictions")(x)
-    model = keras.Model(inputs=inputs, outputs=outputs, name="RetinaGuard_EfficientNetB3")
+    model = keras.Model(inputs=inputs, outputs=outputs, name="RetinaTrace_EfficientNetB3")
 
     if not os.path.exists(AppConfig.WEIGHTS_PATH):
         raise FileNotFoundError(f"Required classifier checkpoint not found: {AppConfig.WEIGHTS_PATH}")

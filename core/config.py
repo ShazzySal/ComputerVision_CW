@@ -19,6 +19,12 @@ class AppConfig:
     DEFAULT_CONFIDENCE_THRESHOLD: float = 0.70
     ENABLE_OPTIC_DISC_REMOVAL: bool = False
 
+    # Advanced Preprocessing Configuration
+    CLAHE_CLIP_LIMIT: float = 2.0
+    CLAHE_GRID_SIZE: tuple = (8, 8)
+    EDGE_SHARPEN_STRENGTH: float = 1.2
+    EDGE_SHARPEN_SIGMA: float = 3.0
+
     WEIGHTS_PATH: str = str(PROJECT_ROOT / "checkpoints" / "best_phase2.weights.h5")
     UNET_WEIGHTS_PATH: str = str(PROJECT_ROOT / "checkpoints" / "unet_lesion_best.weights.h5")
     EMBEDDINGS_PATH: str = str(PROJECT_ROOT / "embeddings.npz")
