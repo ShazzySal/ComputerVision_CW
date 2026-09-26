@@ -2,6 +2,11 @@
 
 Provides reproducible training routines for two-phase transfer learning on EfficientNetB3,
 including custom callbacks for Quadratic Weighted Kappa (QWK) tracking and overfitting prevention.
+
+Two-Phase Training Protocol (matches diabetic_retinopathy_detection.ipynb):
+  Phase 1: Frozen backbone — train head only at lr=1e-3 for 15 epochs.
+  Phase 2: Top-30 layers unfrozen — fine-tune at lr=1e-5 for 25 epochs.
+  Both phases use label_smoothing=0.1 (AppConfig.LABEL_SMOOTHING) and class_weight dict.
 """
 
 import os
@@ -12,6 +17,59 @@ from tensorflow import keras
 from tensorflow.keras import callbacks
 
 from core.config import AppConfig
+
+
+def compile_for_phase1(model: keras.Model) -> None:
+    """Compile model for Phase 1 (frozen backbone, head-only training).
+
+    Uses Adam at AppConfig.PHASE1_LR (1e-3) with CategoricalCrossentropy
+    and label_smoothing=AppConfig.LABEL_SMOOTHING (0.1). Matches notebook
+    compile_model_phase1() exactly.
+    """
+    model.compile(
+        optimizer=keras.optimizers.Adam(learning_rate=AppConfig.PHASE1_LR),
+        loss=keras.losses.CategoricalCrossentropy(
+            label_smoothing=AppConfig.LABEL_SMOOTHING
+        ),
+        metrics=["accuracy"],
+    )
+
+
+def compile_for_phase2(model: keras.Model) -> None:
+    """Compile model for Phase 2 (top-30 layers unfrozen, domain fine-tuning).
+
+    Uses Adam at AppConfig.PHASE2_LR (1e-5) with the same label smoothing.
+    Matches notebook Phase 2 recompile step exactly.
+    """
+    model.compile(
+        optimizer=keras.optimizers.Adam(
+            learning_rate=AppConfig.PHASE2_LR,
+            beta_1=0.9,
+            beta_2=0.999,
+            epsilon=1e-7,
+        ),
+        loss=keras.losses.CategoricalCrossentropy(
+            label_smoothing=AppConfig.LABEL_SMOOTHING
+        ),
+        metrics=["accuracy"],
+    )
+
+
+def unfreeze_top_n_layers(
+    base_model: keras.Model,
+    n: int = AppConfig.PHASE2_UNFROZEN_LAYERS,
+) -> None:
+    """Unfreeze the top-N layers of the EfficientNetB3 backbone for Phase 2.
+
+    Freezes all layers except the final ``n`` layers of the base model.
+    Default n=AppConfig.PHASE2_UNFROZEN_LAYERS=30, matching the notebook's
+    ``Config.UNFREEZE_TOP_N = 30`` setting.
+    """
+    base_model.trainable = True
+    freeze_until = len(base_model.layers) - n
+    for i, layer in enumerate(base_model.layers):
+        layer.trainable = i >= freeze_until
+
 
 
 def compute_qwk(y_true: np.ndarray, y_pred: np.ndarray, num_classes: int = 5) -> float:

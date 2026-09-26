@@ -1,8 +1,8 @@
-experiment_id,phase,learning_rate,epochs_trained,loss,accuracy,val_loss,val_accuracy,qwk_kappa,leakage_defense
-EXP-01_Phase1_FeatureExtraction,Phase 1 (Frozen Base),1e-3,10,0.4820,0.8124,0.4190,0.8350,0.7680,Zero Shared Patients Across Splits
-EXP-02_Phase2_FineTuning,Phase 2 (Top 65 Unfrozen),1e-4 (Cosine),25,0.1984,0.9120,0.2510,0.8810,0.8510,Zero Shared Patients Across Splits
-EXP-03_FinalEvaluated,Held-Out Test Set (5705 imgs),N/A,N/A,0.2318,0.8741,0.2318,0.8741,0.8421,Zero Shared Patients Across Splits
-ABL-01_Without_Ben_Graham,Raw RGB + Interp Resizing,1e-4,25,0.3120,0.8240,0.3450,0.8150,0.7410,Zero Shared Patients Across Splits
-ABL-02_Without_Augmentation,Preproc without Rot/Flips,1e-4,25,0.1450,0.9410,0.3920,0.7980,0.7230,Overfitting: Severe Val Divergence
-ABL-03_Without_Class_Weights,Unweighted Cross-Entropy,1e-4,25,0.2210,0.8520,0.2890,0.8310,0.7620,Severe Minority Stage Misclassifications
-ABL-04_ResNet50_Baseline,ResNet-50 Benchmark,1e-4,25,0.2760,0.8410,0.3120,0.8290,0.7810,Zero Shared Patients Across Splits
+experiment_id,phase,learning_rate,epochs_run,best_epoch,train_loss,train_accuracy,val_loss,val_accuracy,qwk_kappa,leakage_defense,notes
+EXP-01_Phase1_FeatureExtraction,Phase 1 - Frozen Backbone (Head Only),1e-3,15,10,0.3842,0.8360,0.4102,0.8240,N/A,Zero Shared Patients Across Splits,Notebook output: best weights restored Epoch 10 val_accuracy=82.40%
+EXP-02_Phase2_FineTuning,Phase 2 - Top 30 Layers Unfrozen,1e-5,25,18,0.2215,0.8835,0.2541,0.8765,N/A,Zero Shared Patients Across Splits,Notebook output: best weights restored Epoch 18 val_accuracy=87.65%
+EXP-03_FinalEvaluated,Held-Out Test Set (5705 imgs),N/A,N/A,N/A,0.2318,0.8741,0.2318,0.8741,0.8421,Zero Shared Patients Across Splits,Patient-safe duplicate-controlled split; class supports differ from historical val split
+ABL-01_Without_Ben_Graham,Projected: Raw RGB + Interp Resizing only,1e-5,25,N/A,N/A,N/A,N/A,N/A,N/A,Planned - not re-run on current split,Expected direction: reduced edge density and lesion contrast vs full pipeline
+ABL-02_Without_Augmentation,Projected: No geometric/photometric augmentation,1e-5,25,N/A,N/A,N/A,N/A,N/A,N/A,Planned - not re-run on current split,Expected direction: training/val divergence indicating overfitting without regularization
+ABL-03_Without_Class_Weights,Projected: Unweighted cross-entropy loss,1e-5,25,N/A,N/A,N/A,N/A,N/A,N/A,Planned - not re-run on current split,Expected direction: degraded minority class recall (Mild NPDR Stage 1)
+ABL-04_ResNet50_Baseline,Projected: ResNet-50 ImageNet backbone,1e-5,25,N/A,N/A,N/A,N/A,N/A,N/A,Planned - not re-run on current split,Expected direction: lower QWK vs EfficientNetB3 compound-scaled feature extraction

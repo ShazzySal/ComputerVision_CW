@@ -1,6 +1,6 @@
-experiment,accuracy,macro_f1,qwk
-full_system,0.8741,0.7847,0.8421
-without_augmentation,0.7980,0.6840,0.7230
-without_class_weights,0.8310,0.7120,0.7620
-without_ben_graham,0.8150,0.7010,0.7410
-frozen_efficientnet,0.8350,0.7320,0.7680
+experiment,status,val_accuracy,val_loss,qwk_kappa,macro_f1,notes
+full_system (EXP-03),completed_on_held_out_test,0.8741,0.2318,0.8421,0.7847,Real run; 5705 held-out images; patient-safe split; see experiment_log.csv EXP-03
+without_ben_graham,planned_not_run,,,,,Expected: lower val_accuracy and QWK due to reduced illumination normalisation; not re-run on current split
+without_augmentation,planned_not_run,,,,,Expected: training/val accuracy divergence (overfitting signal); not re-run on current split
+without_class_weights,planned_not_run,,,,,Expected: degraded Mild NPDR recall (Stage 1 F1 below 0.63); not re-run on current split
+frozen_efficientnet,planned_not_run,,,,,Expected: lower QWK than fine-tuned; head-only training cannot adapt backbone to retinal domain; not re-run on current split
