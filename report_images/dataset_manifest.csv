@@ -1,13 +1,17 @@
 scope,metric,value,unit,provenance,interpretation
-local,total_image_records,38034,records,data/labels.csv; report_images/dataset_audit_summary.csv,One labeled row and audited image path per record; not a unique-patient count
-local,No_DR,12996,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 0
-local,Mild_NPDR,5825,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 1
-local,Moderate_NPDR,8262,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 2
-local,Severe_NPDR,5373,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 3
-local,Proliferative_DR,5578,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 4
-local,train,26623,records,report_images/dataset_audit_summary.csv,69.998 percent of local image records
-local,validation,5706,records,report_images/dataset_audit_summary.csv,15.002 percent of local image records
-local,test,5705,records,report_images/dataset_audit_summary.csv,15.000 percent of local image records
+local_download,total_image_files,38034,files,Counted recursively in data/train; data/val; data/test,Image files on disk including byte-identical copies
+local_download,train_directory,21000,files,data/train,Matches the Kaggle About Dataset approximate count; page does not state train-only scope
+local_download,val_directory,8349,files,data/val,Downloaded validation directory
+local_download,test_directory,8685,files,data/test,Downloaded test directory
+local_labels,labels_csv_rows,38034,records,data/labels.csv,One row per image record; not a unique-patient count
+local_class_counts,No_DR,12996,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 0
+local_class_counts,Mild_NPDR,5825,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 1
+local_class_counts,Moderate_NPDR,8262,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 2
+local_class_counts,Severe_NPDR,5373,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 3
+local_class_counts,Proliferative_DR,5578,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 4
+local_model_split,train,26623,records,report_images/dataset_audit_summary.csv,69.998 percent; duplicate-safe grouped model partition
+local_model_split,validation,5706,records,report_images/dataset_audit_summary.csv,15.002 percent; duplicate-safe grouped model partition
+local_model_split,test,5705,records,report_images/dataset_audit_summary.csv,15.000 percent; duplicate-safe grouped model partition
 Kaggle_page_reported,APTOS_2019,3662,images,Kaggle dataset page,Source count reported by Kaggle; not locally attributable
 Kaggle_page_reported,IDRiD,516,images,Kaggle dataset page,Source count reported by Kaggle; not locally attributable
 Kaggle_page_reported,Messidor_2,1748,images,Kaggle dataset page,Source count reported by Kaggle; not locally attributable
@@ -15,6 +19,10 @@ Kaggle_page_reported,EyePACS_selected_subset,15075,images,Kaggle dataset page,So
 Kaggle_page_reported,component_count_sum,21001,images,Sum of Kaggle page component counts,Approximate 21000-image description; differs from file explorer count
 local_duplicate_audit,exact_duplicate_clusters,1454,clusters,report_images/deduplication_log.csv,Exact perceptual-hash clusters; duplicate records retained
 local_duplicate_audit,images_in_exact_duplicate_clusters,3199,records,report_images/deduplication_log.csv,Records belonging to exact-hash clusters
+local_duplicate_audit,sha256_identical_content_clusters,131,clusters,Independent SHA-256 scan of all downloaded image files,Byte-identical file contents
+local_duplicate_audit,files_in_sha256_identical_content_clusters,262,files,Independent SHA-256 scan of all downloaded image files,Records across byte-identical groups
+local_duplicate_audit,extra_sha256_identical_file_copies,131,files,Independent SHA-256 scan of all downloaded image files,Additional copies beyond one file per byte-identical group
+local_duplicate_audit,unique_sha256_file_contents,37903,contents,Independent SHA-256 scan of all downloaded image files,Distinct byte contents; not guaranteed visually unique images
 local_duplicate_audit,unique_exact_hash_values_including_singletons,36289,hash_values,report_images/deduplication_log.csv,Includes singleton hash values and is not a duplicate-cluster count
 local_duplicate_audit,near_duplicate_candidate_pairs_screened,372,pairs,report_images/deduplication_log.csv,Screen limited to first 1000 hash-bearing images per class
 local_duplicate_audit,cross_split_leaks_in_screened_relationships,0,relationships,report_images/deduplication_log.csv,No cross-split exact-hash or screened near-duplicate relationships reported
