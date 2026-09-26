@@ -1,4 +1,4 @@
-"""Application configuration for RetinaGuard AI."""
+"""Application configuration for RetinaTrace AI."""
 
 from pathlib import Path
 
@@ -6,7 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class AppConfig:
-    """Centralized configuration parameters for RetinaGuard AI."""
+    """Centralized configuration parameters for RetinaTrace AI."""
 
     IMG_SIZE: int = 224
     NUM_CLASSES: int = 5

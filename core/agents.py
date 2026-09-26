@@ -157,14 +157,9 @@ class GovernanceAgent:
         # Flag for review if confidence is low OR if evidence is potentially inconsistent
         recommend_manual_review = flagged or (consistency_analysis.get("status") in ("POTENTIALLY INCONSISTENT", "INSUFFICIENT EVIDENCE"))
 
-        if recommend_manual_review:
-            if flagged:
-                review_reason = (f"Model confidence ({confidence*100:.1f}%) is BELOW the clinical safety threshold "
-                                 f"({self.threshold*100:.0f}%).")
-            else:
-                review_reason = ("Independent visual evidence is insufficient or potentially inconsistent with "
-                                 "the classifier prediction.")
-            message = (f"SAFETY INTERCEPTION ACTIVATED: {review_reason} Automated treatment recommendations have been WITHHELD to eliminate hallucination risks. "
+        if flagged:
+            message = (f"SAFETY INTERCEPTION ACTIVATED: Model confidence ({confidence*100:.1f}%) is BELOW the clinical safety threshold "
+                       f"({self.threshold*100:.0f}%). Automated treatment recommendations have been WITHHELD to eliminate hallucination risks. "
                        "The patient case has been flagged for mandatory specialist review.")
             controlled_advisory = {"urgency": "HUMAN SPECIALIST TRIAGE MANDATORY", "plan": message,
                                    "followup": "Withheld — Manual Slit-Lamp Examination Required Immediately",

@@ -22,6 +22,7 @@ Architecture Features:
 """
 
 import os
+from difflib import SequenceMatcher
 from typing import Tuple, List, Dict, Any, Union, Optional
 import numpy as np
 import cv2
@@ -132,15 +133,15 @@ _CLINICAL_KB: List[Dict[str, Any]] = [
         "keys": ["unet", "u-net", "segmentation", "lesion", "layer 3", "mask"],
         "reply": (
             "**Auxiliary U-Net — Layer 3 Pixel-Level Lesion Segmentation**\n\n"
-            "A symmetrical U-Net architecture provides pixel-level lesion contours "
-            "(microaneurysms, exudates highlighted in fluorescent green).\n\n"
-            "Because the 38,034-image dataset lacks manual pixel-level annotations, "
-            "masks are synthesized via a **semi-supervised self-distillation pipeline**:\n"
-            "1. Green-channel optical extraction (best hemoglobin contrast).\n"
-            "2. Morphological Top-Hat (bright exudates) + Black-Hat (dark microaneurysms).\n"
-            "3. Grad-CAM saliency gating (threshold > 0.35) to discard non-pathological edges.\n\n"
-            "The U-Net is trained with a **Hybrid Soft Dice + BCE Loss** to handle "
-            "the extreme class imbalance (<2% lesion pixels)."
+            "The U-Net predicts a pixel-level lesion probability map, which is visualized "
+            "with highlighted candidate regions.\n\n"
+            "In the notebook training workflow, manual pixel masks were unavailable for the "
+            "38,034-image dataset, so pseudo-masks were generated from the green channel, "
+            "Top-Hat and Black-Hat morphology, and Grad-CAM saliency above 0.35. These are "
+            "synthetic training targets, not manual ground truth.\n\n"
+            "The notebook trains the U-Net with a **Hybrid Soft Dice + BCE Loss**. In the "
+            "deployed app, the loaded U-Net mask is additionally filtered at 0.35 and combined "
+            "with a Grad-CAM threshold of 0.30. The result is visual support, not an independent diagnosis."
         ),
     },
     {
@@ -237,56 +238,217 @@ _CHATBOT_FALLBACK = (
     "Quadratic Weighted Kappa, referral guidelines, or the training dataset."
 )
 
+_SIMPLE_CHAT_REPLIES = {
+    "lesion": (
+        "A retinal lesion is an area of damage or abnormality in the retina, such as a "
+        "microaneurysm, haemorrhage, or exudate. RetinaTrace highlights possible lesion areas "
+        "to help a clinician review the image; the highlights are not a confirmed diagnosis."
+    ),
+    "grad-cam": (
+        "Grad-CAM is a heatmap showing which parts of the retinal image influenced the model's "
+        "prediction. It helps the user see where the model was looking."
+    ),
+    "unet": (
+        "U-Net is the part of RetinaTrace that highlights possible lesion areas pixel by pixel. "
+        "It helps show where abnormalities may be present, but the highlighted areas still need clinical confirmation."
+    ),
+    "efficientnet": (
+        "EfficientNetB3 is the image-classification model used by RetinaTrace. It examines the "
+        "retinal photograph and estimates the most likely diabetic-retinopathy stage."
+    ),
+    "governance": (
+        "The Governance Agent is a safety check. If the result is uncertain or the supporting "
+        "evidence does not agree, it withholds automated advice and asks for specialist review."
+    ),
+    "refer": (
+        "Referral urgency depends on the detected retinopathy stage. More severe or uncertain "
+        "results need faster review by an ophthalmologist."
+    ),
+    "stage 0": "Stage 0 means no diabetic-retinopathy signs were detected in the image.",
+    "stage 1": "Stage 1 means mild diabetic retinopathy, usually limited to microaneurysms.",
+    "stage 2": "Stage 2 means moderate diabetic retinopathy with more retinal changes than Stage 1.",
+    "stage 3": "Stage 3 means severe non-proliferative diabetic retinopathy and needs prompt specialist review.",
+    "stage 4": "Stage 4 means proliferative diabetic retinopathy, which requires urgent specialist assessment.",
+}
 
-def respond_to_clinical_query(message: str, history: Optional[List] = None, pred_context: dict = None) -> tuple:
-    """Rule-based clinical knowledge chatbot for DR staging and model architecture queries.
-    If pred_context is provided (from the current analysis), context-aware questions are answered."""
-    if history is None:
-        history = []
-    else:
-        history = list(history)
 
-    if not message or not str(message).strip():
-        return history, ""
-    query = str(message).lower().strip()
-    reply = None
+class ChatRouterAgent:
+    """Routes a chat message to a safe, explicit response path."""
 
-    # Context-aware answers about the current prediction
-    if pred_context and isinstance(pred_context, dict) and pred_context.get("stage_name"):
-        ctx_triggers = ["why", "classified", "this image", "current", "result", "prediction", "explain this",
-                        "why moderate", "why severe", "why mild", "why proliferative", "why no dr",
-                        "confidence", "how confident", "what was found", "lesion", "quadrant", "peak"]
-        if any(t in query for t in ctx_triggers):
+    _COMMON_INTENTS = {
+        "greeting": {"hi", "hii", "hiii", "hello", "helloo", "hey", "heyy", "goodmorning", "goodafternoon", "goodevening"},
+        "help": {"help", "whatcanyoudo", "whatcaniask", "whatquestionscaniask"},
+        "thanks": {"thanks", "thankyou", "thanku", "thankyouu", "thnks", "thx", "ty", "tq", "okay", "ok", "okk"},
+        "definition": {"whatisdiabeticretinopathy", "whatisdr", "definediabeticretinopathy"},
+    }
+
+    @staticmethod
+    def _technical_request(query: str) -> bool:
+        technical_terms = [
+            "student", "developer", "technical", "implementation", "architecture", "algorithm",
+            "code", "training", "trained", "loss", "pipeline", "threshold", "model layers",
+            "how does", "how is", "in detail", "under the hood", "show me",
+        ]
+        return any(term in query for term in technical_terms)
+
+    @staticmethod
+    def _close_match(query_key: str, phrases: set) -> bool:
+        return any(
+            query_key == phrase or SequenceMatcher(None, query_key, phrase).ratio() >= 0.78
+            for phrase in phrases
+        )
+
+    def process(
+        self,
+        query: str,
+        pred_context: Optional[dict] = None,
+        history: Optional[List] = None,
+    ) -> Dict[str, Any]:
+        query_key = "".join(ch for ch in query if ch.isalnum())
+        for intent, phrases in self._COMMON_INTENTS.items():
+            if self._close_match(query_key, phrases):
+                return {"intent": intent, "entry": None}
+
+        high_risk_terms = [
+            "should i start treatment", "should i take medicine", "what medication should i take",
+            "can i start treatment", "should i inject", "prescribe", "dosage", "treat myself",
+        ]
+        if any(term in query for term in high_risk_terms):
+            return {"intent": "high_risk", "entry": None}
+
+        if pred_context and pred_context.get("stage_name"):
+            if query_key in {"why", "whythis", "explain", "more", "moreinfo", "whataboutthat"}:
+                return {"intent": "prediction_context", "entry": None, "topic": "classification"}
+            triggers = ["why", "classified", "this image", "current", "result", "prediction", "explain this",
+                        "confidence", "how confident", "what was found", "lesion", "quadrant", "peak",
+                        "this patient", "this case", "referred", "refer this"]
+            if any(trigger in query for trigger in triggers):
+                if any(word in query for word in ["lesion", "exudate", "microaneurysm"]):
+                    topic = "lesions"
+                elif any(word in query for word in ["confidence", "certain"]):
+                    topic = "confidence"
+                elif any(word in query for word in ["urgent", "urgency", "follow-up", "follow up", "action", "refer"]):
+                    topic = "advisory"
+                elif any(word in query for word in ["quadrant", "peak", "grad-cam", "gradcam"]):
+                    topic = "attention"
+                else:
+                    topic = "classification"
+                return {"intent": "prediction_context", "entry": None, "topic": topic}
+
+        for entry in _CLINICAL_KB:
+            if any(keyword in query for keyword in entry["keys"]):
+                return {
+                    "intent": "knowledge_base",
+                    "entry": entry,
+                    "technical": self._technical_request(query),
+                }
+        return {"intent": "unknown", "entry": None}
+
+
+class ChatKnowledgeAgent:
+    """Builds a response from the routed knowledge or approved prediction context."""
+
+    def process(self, query: str, route: Dict[str, Any], pred_context: Optional[dict] = None) -> str:
+        intent = route["intent"]
+        if intent == "greeting":
+            return "Hello. I am the **RetinaTrace Clinical Knowledge Assistant**. Ask me about diabetic retinopathy stages, this model, or clinical guidelines."
+        if intent == "help":
+            return "I can explain **DR stages 0–4**, Grad-CAM, U-Net lesion segmentation, the Governance Agent, referral guidance, preprocessing, and the current prediction."
+        if intent == "thanks":
+            return "You are welcome. Ask another question whenever you are ready."
+        if intent == "definition":
+            return "**Diabetic retinopathy** is damage to the retinal blood vessels caused by diabetes. It progresses from no retinopathy through non-proliferative stages to proliferative disease. Regular eye screening and good blood-glucose and blood-pressure control are important."
+        if intent == "high_risk":
+            return (
+                "I cannot recommend starting, stopping, or changing treatment from an AI chat response. "
+                "Please discuss medication or procedures with a qualified ophthalmologist or the patient's clinician."
+            )
+        if intent == "knowledge_base":
+            if not route.get("technical"):
+                for keyword, simple_reply in _SIMPLE_CHAT_REPLIES.items():
+                    if keyword in query:
+                        return simple_reply
+            return route["entry"]["reply"]
+        if intent == "prediction_context":
             stage_name = pred_context.get("stage_name", "Unknown")
             conf = pred_context.get("confidence", 0.0)
-            urgency = pred_context.get("urgency", "N/A")
-            followup = pred_context.get("followup", "N/A")
-            plan = pred_context.get("plan", "N/A")
-            peak_q = pred_context.get("peak_quadrant", "-")
-            lesion_pct = pred_context.get("lesion_pct", 0.0)
-            reply = (
+            topic = route.get("topic", "classification")
+            if topic == "lesions":
+                return (
+                    f"**Lesions in the current analysis**\n\n"
+                    f"The U-Net identified lesion candidates in **{pred_context.get('lesion_pct', 0.0):.1f}%** of the retinal area. "
+                    "These candidates may include microaneurysms or exudate-like regions and should be clinically confirmed."
+                )
+            if topic == "confidence":
+                return f"The current **{stage_name}** prediction has a model confidence of **{conf*100:.1f}%**."
+            if topic == "advisory":
+                urgency = pred_context.get("urgency", "N/A")
+                followup = pred_context.get("followup", "N/A")
+                plan = pred_context.get("plan", "")
+                if "HUMAN SPECIALIST TRIAGE" in urgency:
+                    return (
+                        "This result should be reviewed **urgently by an ophthalmologist**. "
+                        f"The safety gate requires specialist triage because the model confidence is **{conf*100:.1f}%**, "
+                        f"below the **70%** threshold. Automated treatment advice should not be followed without clinical confirmation."
+                    )
+                return (
+                    f"**Current clinical routing**\n\n"
+                    f"- Urgency: **{urgency}**\n"
+                    f"- Follow-up: **{followup}**\n"
+                    f"- Action: {plan}"
+                )
+            if topic == "attention":
+                return (
+                    f"Grad-CAM identified **{pred_context.get('peak_quadrant', '-')}** as the peak attention quadrant. "
+                    "This shows which region influenced the model and is not, by itself, a diagnosis."
+                )
+            if topic == "classification":
+                return (
+                    f"The image was classified as **{stage_name}** with **{conf*100:.1f}% confidence**. "
+                    f"The main supporting signals were the Grad-CAM peak in **{pred_context.get('peak_quadrant', '-')}** "
+                    f"and U-Net lesion candidates covering **{pred_context.get('lesion_pct', 0.0):.1f}%** of the retinal area. "
+                    "Because this result is AI-assisted, it should be confirmed by an ophthalmologist."
+                )
+            return (
                 f"**Current Prediction Context: {stage_name}**\n\n"
                 f"The model classified this fundus image as **{stage_name}** with a confidence of **{conf*100:.1f}%**.\n\n"
-                f"**Why this classification?**\n"
-                f"- The Grad-CAM attention map highlighted the **{peak_q}** quadrant as the primary region of pathological activation.\n"
-                f"- The U-Net lesion segmentation identified **{lesion_pct:.1f}%** of the retinal parenchyma as containing lesion candidates (microaneurysms / exudates).\n"
-                f"- These visual features are consistent with the morphological criteria for **{stage_name}** on the ICDR severity scale.\n\n"
-                f"**Clinical Advisory:**\n"
-                f"- Urgency: {urgency}\n"
-                f"- Recommended follow-up: {followup}\n"
-                f"- Action: {plan}\n\n"
-                f"*Note: This is an AI-assisted analysis. Always confirm with a qualified ophthalmologist.*"
+                f"- Grad-CAM peak quadrant: **{pred_context.get('peak_quadrant', '-')}**\n"
+                f"- U-Net lesion candidates: **{pred_context.get('lesion_pct', 0.0):.1f}%**\n"
+                f"- Urgency: **{pred_context.get('urgency', 'N/A')}**\n"
+                f"- Follow-up: **{pred_context.get('followup', 'N/A')}**\n"
+                f"- Action: {pred_context.get('plan', 'N/A')}"
             )
+        return _CHATBOT_FALLBACK
 
-    if reply is None:
-        for entry in _CLINICAL_KB:
-            if any(kw in query for kw in entry["keys"]):
-                reply = entry["reply"]
-                break
 
-    if reply is None:
-        reply = _CHATBOT_FALLBACK
+class ChatGovernanceAgent:
+    """Applies a final clinical disclaimer before a chat response is released."""
 
+    def process(self, reply: str, route: Dict[str, Any]) -> str:
+        if route["intent"] in {"knowledge_base", "prediction_context", "definition"} and "qualified ophthalmologist" not in reply:
+            return reply + "\n\n*This is AI-assisted information. Confirm clinical decisions with a qualified ophthalmologist.*"
+        return reply
+
+
+def run_chat_pipeline(
+    message: str,
+    pred_context: Optional[dict] = None,
+    history: Optional[List] = None,
+) -> str:
+    """Run the chatbot router, knowledge/context agent, and final safety gate."""
+    query = str(message).lower().strip()
+    router = ChatRouterAgent()
+    route = router.process(query, pred_context, history)
+    response = ChatKnowledgeAgent().process(query, route, pred_context)
+    return ChatGovernanceAgent().process(response, route)
+
+
+def respond_to_clinical_query(message: str, history: Optional[List] = None, pred_context: dict = None) -> tuple:
+    """Gradio adapter for the explicit multi-agent chat pipeline."""
+    history = [] if history is None else list(history)
+    if not message or not str(message).strip():
+        return history, ""
+    reply = run_chat_pipeline(message, pred_context, history)
     history.append({"role": "user", "content": message})
     history.append({"role": "assistant", "content": reply})
     return history, ""
@@ -1376,7 +1538,7 @@ gradio-app {
     font-weight: 700 !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    background: #ffffff !important;
+    background: #f0fdfa !important;
     color: #0f172a !important;
     border: 1px solid #cbd5e1 !important;
     box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
@@ -2003,6 +2165,80 @@ gradio-app {
     box-shadow: 0 8px 26px rgba(13, 148, 136, 0.6) !important;
 }
 
+/* Compact assistant window opened from the floating pill */
+.rg-chat-floating-panel {
+    position: fixed !important;
+    right: 24px !important;
+    bottom: 82px !important;
+    z-index: 99998 !important;
+    width: min(560px, calc(100vw - 48px)) !important;
+    height: min(680px, calc(100vh - 118px)) !important;
+    overflow: hidden !important;
+    padding: 18px 20px 20px !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.28) !important;
+    animation: rg-chat-panel-in 0.18s ease-out !important;
+}
+.dark .rg-chat-floating-panel {
+    background: #102a43 !important;
+    border-color: #334155 !important;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5) !important;
+}
+.rg-chat-floating-panel .rg-chat-close {
+    position: absolute !important;
+    top: 10px !important;
+    right: 12px !important;
+    z-index: 2 !important;
+    width: 30px !important;
+    height: 30px !important;
+    padding: 0 !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    color: #475569 !important;
+    font-size: 20px !important;
+    line-height: 1 !important;
+    cursor: pointer !important;
+}
+.dark .rg-chat-floating-panel .rg-chat-close {
+    border-color: #475569 !important;
+    color: #cbd5e1 !important;
+}
+.rg-chat-floating-panel .rg-chat-close:hover {
+    background: #e2e8f0 !important;
+}
+.dark .rg-chat-floating-panel .rg-chat-close:hover {
+    background: #1e293b !important;
+}
+.rg-chat-floating-panel .rg-chat-specs {
+    display: none !important;
+}
+.rg-chat-floating-panel [role="log"] {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+}
+.rg-chat-floating-panel .rg-chat-input-row {
+    align-items: stretch !important;
+    gap: 8px !important;
+}
+.rg-chat-floating-panel .rg-chat-input-row > div,
+.rg-chat-floating-panel .rg-chat-input-row button {
+    align-self: stretch !important;
+}
+.rg-chat-floating-panel .rg-chat-input-row textarea,
+.rg-chat-floating-panel .rg-chat-input-row button {
+    min-height: 50px !important;
+    height: 50px !important;
+    box-sizing: border-box !important;
+}
+@keyframes rg-chat-panel-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* Mobile hamburger button */
 #rg-mobile-menu-btn {
     display: none;
@@ -2183,6 +2419,13 @@ gradio-app {
         padding: 8px 14px !important;
         font-size: 12px !important;
     }
+    .rg-chat-floating-panel {
+        right: 10px !important;
+        bottom: 68px !important;
+        width: calc(100vw - 20px) !important;
+        height: min(680px, calc(100vh - 92px)) !important;
+        padding: 16px 12px 14px !important;
+    }
 }
 </style>
 """
@@ -2215,8 +2458,22 @@ HEAD_SCRIPT = """
         function findTabButton() {
             const roots = getAllRoots();
 
-            // Strategy 1: Find tab button by text match (excluding sidebar buttons)
-            if (cleanLabel) {
+            // Gradio renders TabItem controls as ordinary buttons without the
+            // supplied elem_id. Prefer the visible tab label when an explicit
+            // navigation target is requested.
+            if (cleanLabel && elemId) {
+                const directButtons = Array.from(document.querySelectorAll('button, [role="tab"]'));
+                const directTarget = directButtons.find(function(btn) {
+                    if (btn.closest && btn.closest('#rg-sidebar')) return false;
+                    if (btn.closest && btn.closest('.tab-container.visually-hidden')) return false;
+                    return (btn.textContent || '').toLowerCase().includes(cleanLabel);
+                });
+                if (directTarget) return directTarget;
+            }
+
+            // Strategy 1: Find tab button by text match (excluding sidebar buttons).
+            // When an explicit element ID is supplied, resolve that stable target first.
+            if (cleanLabel && !elemId) {
                 for (let i = 0; i < roots.length; i++) {
                     const r = roots[i];
                     let buttons = [];
@@ -2287,13 +2544,29 @@ HEAD_SCRIPT = """
 
         const target = findTabButton();
         if (target) {
-            target.click();
-            try {
-                target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
-            } catch(e) {}
-            setTimeout(function() {
-                try { target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch(e) {}
-            }, 50);
+            const overflowMenu = target.closest && target.closest('.overflow-dropdown');
+            const activateTarget = function() {
+                target.click();
+                try {
+                    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
+                } catch(e) {}
+                setTimeout(function() {
+                    try { target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch(e) {}
+                }, 50);
+            };
+            if (overflowMenu && overflowMenu.classList.contains('hide')) {
+                const moreTabs = Array.from(document.querySelectorAll('button')).find(function(button) {
+                    return (button.textContent || '').trim().toLowerCase() === 'more tabs';
+                });
+                if (moreTabs) {
+                    moreTabs.click();
+                    setTimeout(activateTarget, 100);
+                } else {
+                    activateTarget();
+                }
+            } else {
+                activateTarget();
+            }
         } else {
             console.warn('[RetinaTrace] Tab target not found for:', label, elemId);
             setTimeout(function() {
@@ -2373,6 +2646,48 @@ HEAD_SCRIPT = """
         }
     };
 
+    window.retinaToggleChat = function() {
+        const existingPanel = document.querySelector('[role="tabpanel"].rg-chat-floating-panel');
+        if (existingPanel) {
+            window.retinaCloseChat();
+            return;
+        }
+
+        window.retinaChatPreviousTab = Array.from(document.querySelectorAll('button, [role="tab"]'))
+            .find(function(btn) {
+                return !btn.closest('#rg-sidebar') && btn.getAttribute('aria-selected') === 'true';
+            });
+        if (window.retinaOpenTab) {
+            window.retinaOpenTab('AI Clinical Chatbot', null, 'rg-tab-chat');
+        }
+        setTimeout(function() {
+            const chatTarget = document.getElementById('rg-tab-chat');
+            if (!chatTarget) return;
+            let panel = chatTarget;
+            while (panel && panel !== document.body && panel.getAttribute('role') !== 'tabpanel') {
+                panel = panel.parentElement;
+            }
+            panel = panel && panel.getAttribute('role') === 'tabpanel' ? panel : chatTarget;
+            panel.classList.add('rg-chat-floating-panel');
+            chatTarget.classList.add('rg-chat-floating-panel');
+        }, 80);
+    };
+
+    window.retinaCloseChat = function() {
+        const chatTarget = document.getElementById('rg-tab-chat');
+        if (!chatTarget) return;
+        let panel = chatTarget;
+        while (panel && panel !== document.body && panel.getAttribute('role') !== 'tabpanel') {
+            panel = panel.parentElement;
+        }
+        if (panel) panel.classList.remove('rg-chat-floating-panel');
+        chatTarget.classList.remove('rg-chat-floating-panel');
+        if (window.retinaChatPreviousTab) {
+            window.retinaChatPreviousTab.click();
+            window.retinaChatPreviousTab = null;
+        }
+    };
+
     function mountSidebar() {
         const sb = document.getElementById('rg-sidebar');
         const bd = document.getElementById('rg-sidebar-backdrop');
@@ -2425,8 +2740,8 @@ THEME_TOGGLE_JS = """
 
 OPEN_CHATBOT_JS = """
 () => {
-    if (window.retinaOpenTab) {
-        window.retinaOpenTab('AI Clinical Chatbot', null, 'rg-tab-chat');
+    if (window.retinaToggleChat) {
+        window.retinaToggleChat();
     }
 }
 """
@@ -2550,8 +2865,8 @@ with gr.Blocks(title="RetinaTrace — Clinical Retinal Intelligence") as demo:
     </div>
 
     <!-- Floating chat pill button (pure HTML, fixed bottom-right, zero flow disruption) -->
-    <div class="rg-floating-chat-pill" onclick="window.retinaOpenTab('AI Clinical Chatbot', null, 'rg-tab-chat')" title="Open AI Clinical Assistant">
-        💬 AI Chatbot
+    <div class="rg-floating-chat-pill" onclick="window.retinaToggleChat()" title="Open AI Clinical Assistant">
+        🤖 AI Chatbot
     </div>
     """)
 
@@ -2686,13 +3001,10 @@ with gr.Blocks(title="RetinaTrace — Clinical Retinal Intelligence") as demo:
 
                 # Tab 4: AI Clinical Chatbot & SaMD Guidelines
                 with gr.TabItem("💬 AI Clinical Chatbot", elem_id="rg-tab-chat"):
+                    gr.HTML('<button class="rg-chat-close" onclick="window.retinaCloseChat()" title="Close AI Clinical Assistant">&times;</button>')
                     gr.Markdown("""
-                    ### 🤖 RetinaGuard Clinical Knowledge Assistant
-                    Ask any question about diabetic retinopathy stages, the model architecture, preprocessing pipeline,
-                    or clinical management guidelines. The assistant references the AAO Preferred Practice Patterns.
-
-                    *Example questions: "What does Stage 3 mean?", "When should I refer a proliferative patient?",
-                    "How does Grad-CAM work?", "What is the Governance Agent?"*
+                    ### 🤖 RetinaTrace Clinical Knowledge Assistant
+                    Ask about diabetic retinopathy, the RetinaTrace model, or clinical guidelines.
                     """)
                     with gr.Row():
                         with gr.Column(scale=3):
@@ -2701,7 +3013,7 @@ with gr.Blocks(title="RetinaTrace — Clinical Retinal Intelligence") as demo:
                                 height=420,
                                 value=[],
                             )
-                            with gr.Row():
+                            with gr.Row(elem_classes=["rg-chat-input-row"]):
                                 chat_input = gr.Textbox(
                                     placeholder="Ask a question about DR staging, the model, or clinical guidelines…",
                                     label="",
@@ -2717,7 +3029,7 @@ with gr.Blocks(title="RetinaTrace — Clinical Retinal Intelligence") as demo:
                             with gr.Row():
                                 chip_gradcam = gr.Button("How does Grad-CAM work?", size="sm", variant="secondary")
                                 chip_refer = gr.Button("When should I refer urgently?", size="sm", variant="secondary")
-                        with gr.Column(scale=2):
+                        with gr.Column(scale=2, elem_classes=["rg-chat-specs"]):
                             gr.Markdown(r"""
                             ### ⚙️ System Specifications:
                             * **Deep Learning Backbone:** EfficientNetB3 fine-tuned on **38,034** multi-source fundus images (APTOS + IDRiD + Messidor-2 + EyePACS).

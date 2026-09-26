@@ -1,0 +1,22 @@
+scope,metric,value,unit,provenance,interpretation
+local,total_image_records,38034,records,data/labels.csv; report_images/dataset_audit_summary.csv,One labeled row and audited image path per record; not a unique-patient count
+local,No_DR,12996,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 0
+local,Mild_NPDR,5825,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 1
+local,Moderate_NPDR,8262,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 2
+local,Severe_NPDR,5373,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 3
+local,Proliferative_DR,5578,records,data/labels.csv; report_images/dataset_audit_summary.csv,Class 4
+local,train,26623,records,report_images/dataset_audit_summary.csv,69.998 percent of local image records
+local,validation,5706,records,report_images/dataset_audit_summary.csv,15.002 percent of local image records
+local,test,5705,records,report_images/dataset_audit_summary.csv,15.000 percent of local image records
+Kaggle_page_reported,APTOS_2019,3662,images,Kaggle dataset page,Source count reported by Kaggle; not locally attributable
+Kaggle_page_reported,IDRiD,516,images,Kaggle dataset page,Source count reported by Kaggle; not locally attributable
+Kaggle_page_reported,Messidor_2,1748,images,Kaggle dataset page,Source count reported by Kaggle; not locally attributable
+Kaggle_page_reported,EyePACS_selected_subset,15075,images,Kaggle dataset page,Source count reported by Kaggle; not locally attributable
+Kaggle_page_reported,component_count_sum,21001,images,Sum of Kaggle page component counts,Approximate 21000-image description; differs from file explorer count
+local_duplicate_audit,exact_duplicate_clusters,1454,clusters,report_images/deduplication_log.csv,Exact perceptual-hash clusters; duplicate records retained
+local_duplicate_audit,images_in_exact_duplicate_clusters,3199,records,report_images/deduplication_log.csv,Records belonging to exact-hash clusters
+local_duplicate_audit,unique_exact_hash_values_including_singletons,36289,hash_values,report_images/deduplication_log.csv,Includes singleton hash values and is not a duplicate-cluster count
+local_duplicate_audit,near_duplicate_candidate_pairs_screened,372,pairs,report_images/deduplication_log.csv,Screen limited to first 1000 hash-bearing images per class
+local_duplicate_audit,cross_split_leaks_in_screened_relationships,0,relationships,report_images/deduplication_log.csv,No cross-split exact-hash or screened near-duplicate relationships reported
+local_split_audit,patient_id_overlap,0,overlapping_ids,report_images/dataset_audit_summary.csv,Zero overlap across train validation and test IDs
+Kaggle_page_reported,license,CC0_Public_Domain,listing,Kaggle dataset page,Upstream dataset terms should be checked before redistribution or clinical use

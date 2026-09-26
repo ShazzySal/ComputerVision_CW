@@ -1,1 +1,1 @@
-"""Core RetinaGuard model and pipeline package."""
+"""Core RetinaTrace model and pipeline package."""

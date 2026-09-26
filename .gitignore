@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 venv/
 env/
+.venv/
 .env
 
 # Jupyter Notebook
@@ -17,7 +18,16 @@ kaggle.json
 # Datasets / Large Artifacts
 dr_data/
 content/
+/data/
 *.tar.gz
+
+# Local split exports contain machine paths and patient/group identifiers.
+/report_images/*_split.csv
+/report_images/experimental_patient_safe/
+/report_images/preprocessing_quality_ablation.csv
+
+# Experimental model outputs; retain only checkpoints intentionally tracked.
+/checkpoints/experimental_patient_safe/
 
 # OS
 Thumbs.db

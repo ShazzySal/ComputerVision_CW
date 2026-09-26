@@ -46,7 +46,17 @@ def ben_graham_enhance(img: np.ndarray) -> np.ndarray:
     return np.clip(enhanced, 0, 255).astype(np.uint8)
 
 
-def preprocess_image(image_input: Union[str, np.ndarray]) -> np.ndarray:
+def denoise_fundus(img: np.ndarray, diameter: int = 5, sigma_color: float = 20.0, sigma_space: float = 20.0) -> np.ndarray:
+    """Apply conservative edge-preserving denoising before enhancement."""
+    if img.ndim == 2:
+        return cv2.bilateralFilter(img, diameter, sigma_color, sigma_space)
+    return cv2.bilateralFilter(img, diameter, sigma_color, sigma_space)
+
+
+def preprocess_image(
+    image_input: Union[str, np.ndarray],
+    apply_denoise: bool = False,
+) -> np.ndarray:
     """Convert an input image into a normalized 224x224 RGB tensor."""
     if isinstance(image_input, str):
         bgr = cv2.imread(image_input)
@@ -79,5 +89,7 @@ def preprocess_image(image_input: Union[str, np.ndarray]) -> np.ndarray:
     h, w = cropped.shape[:2]
     interp = cv2.INTER_AREA if h > AppConfig.IMG_SIZE or w > AppConfig.IMG_SIZE else cv2.INTER_LINEAR
     resized = cv2.resize(cropped, (AppConfig.IMG_SIZE, AppConfig.IMG_SIZE), interpolation=interp)
+    if apply_denoise:
+        resized = denoise_fundus(resized)
     enhanced = ben_graham_enhance(resized)
     return enhanced.astype(np.float32) / 255.0
