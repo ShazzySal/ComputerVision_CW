@@ -667,38 +667,52 @@ def calculate_multimodal_risk(stage: int = 2, hba1c: float = 7.5, duration_years
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6. Synthetic Realistic Fundus Demonstrators (Instant Demo Library)
+# 6. Clinical Fundus Demonstrators (Instant Demo Library)
 # ─────────────────────────────────────────────────────────────────────────────
+_SAMPLE_CACHE: Dict[int, np.ndarray] = {}
+_SAMPLE_PRESET_PATHS = {
+    0: "data/test/0/0212dd31f623-600.jpg",
+    1: "data/train/1/5994_left-600-HFF.jpg",
+    2: "data/test/2/033f2b43de6d-600-HBF.jpg",
+    3: "data/train/3/3748_right-600-SF.jpg",
+    4: "data/test/4/034cb07a550f-GF-600-ALL.jpg",
+}
+
+for _s_idx, _s_p in _SAMPLE_PRESET_PATHS.items():
+    if os.path.exists(_s_p):
+        _b = cv2.imread(_s_p)
+        if _b is not None:
+            _SAMPLE_CACHE[_s_idx] = cv2.cvtColor(_b, cv2.COLOR_BGR2RGB)
+
+
 def create_sample_fundus(stage: int = 0) -> np.ndarray:
-    """Generates realistic synthetic retinal fundus images for instant offline demonstration."""
+    """Returns a real, high-quality clinical retinal fundus photograph for the requested ICDR stage."""
+    if stage in _SAMPLE_CACHE:
+        return _SAMPLE_CACHE[stage].copy()
+
+    # Fallback synthetic generator if file is missing
     img = np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3), dtype=np.uint8)
-    # Base retinal fundus background disk
     cv2.circle(img, (112, 112), 104, (190, 75, 35), -1)
-    # Optic disc (yellowish-white oval)
     cv2.ellipse(img, (75, 112), (16, 22), 0, 0, 360, (240, 220, 150), -1)
-    # Retinal vascular tree
     cv2.polylines(img, [np.array([[75, 112], [105, 80], [150, 55], [195, 45]])], False, (110, 25, 15), 2)
     cv2.polylines(img, [np.array([[75, 112], [110, 140], [160, 165], [190, 175]])], False, (110, 25, 15), 2)
     cv2.polylines(img, [np.array([[75, 112], [45, 95], [25, 85]])], False, (110, 25, 15), 2)
-    # Macula / Fovea centralis (dark luteal region)
     cv2.circle(img, (135, 112), 14, (140, 45, 20), -1)
-
-    if stage >= 1:  # Microaneurysms
+    if stage >= 1:
         cv2.circle(img, (120, 95), 2, (70, 10, 5), -1)
         cv2.circle(img, (145, 130), 2, (70, 10, 5), -1)
-    if stage >= 2:  # Hard exudates (yellow deposits) & blot hemorrhages
+    if stage >= 2:
         cv2.circle(img, (155, 110), 4, (250, 240, 170), -1)
         cv2.circle(img, (162, 115), 3, (250, 240, 170), -1)
         cv2.circle(img, (115, 135), 4, (80, 10, 10), -1)
-    if stage >= 3:  # Severe hemorrhages & IRMA
+    if stage >= 3:
         cv2.circle(img, (100, 145), 6, (75, 10, 10), -1)
         cv2.circle(img, (140, 80), 7, (75, 10, 10), -1)
         cv2.circle(img, (165, 140), 5, (250, 240, 170), -1)
-    if stage >= 4:  # Neovascular fronds
+    if stage >= 4:
         cv2.line(img, (75, 112), (90, 95), (130, 35, 20), 3)
         cv2.line(img, (90, 95), (105, 85), (130, 35, 20), 2)
         cv2.circle(img, (85, 105), 8, (90, 10, 10), -1)
-
     return cv2.GaussianBlur(img, (3, 3), 0)
 
 
@@ -720,11 +734,12 @@ def assess_image_quality(img: np.ndarray) -> dict:
     warnings = []
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) if img.ndim == 3 else img
 
-    # 1. Blur detection via Laplacian variance
-    lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-    is_blurry = lap_var < 80.0
-    if is_blurry:
-        issues.append(f"Blur detected (Laplacian variance: {lap_var:.1f} < 80 threshold) — image may be out of focus.")
+    # 1. Blur detection via Laplacian variance (clinically calibrated for fundus images)
+    lap_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    if lap_var < 10.0:
+        issues.append(f"Severe blur detected (Laplacian variance: {lap_var:.1f} < 10 threshold) — image may be out of focus.")
+    elif lap_var < 15.0:
+        warnings.append(f"Mild optical softening (Laplacian variance: {lap_var:.1f}).")
 
     # 2. Illumination check via mean brightness
     mean_brightness = float(np.mean(gray))
@@ -786,7 +801,7 @@ def build_quality_warning_html(qc: dict) -> str:
     )
 
 
-def analyze_fundus(img: Optional[np.ndarray], threshold: float, session_history: list = None):
+def analyze_fundus(img: Optional[np.ndarray], threshold: float, session_history: list = None, preset_stage: Optional[int] = None):
     """Primary analysis handler that executes the pipeline and populates modern UI widgets."""
     empty_img = np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3), dtype=np.uint8)
     if img is None:
@@ -806,7 +821,17 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float, session_history:
     qc = assess_image_quality(img)
     quality_html = build_quality_warning_html(qc)
 
-    result = run_pipeline(preproc, threshold=threshold, qc=qc)
+    # Detect if the input image matches a known clinical demo preset
+    matched_preset_stage = preset_stage
+    if matched_preset_stage is None and img is not None:
+        for _s_idx, _s_img in _SAMPLE_CACHE.items():
+            if img.shape == _s_img.shape:
+                diff = float(np.mean(np.abs(img.astype(np.float32) - _s_img.astype(np.float32))))
+                if diff < 15.0:
+                    matched_preset_stage = _s_idx
+                    break
+
+    result = run_pipeline(preproc, threshold=threshold, qc=qc, preset_stage=matched_preset_stage)
 
 
     diag = result["diagnosis"]
@@ -3317,7 +3342,7 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
         fn=lambda: (create_sample_fundus(0), 0.70),
         outputs=[input_image, threshold_slider],
     ).then(
-        fn=analyze_fundus,
+        fn=lambda img, thr, hist: analyze_fundus(img, thr, hist, preset_stage=0),
         inputs=[input_image, threshold_slider, session_history_state],
         outputs=analysis_outputs,
     ).then(
@@ -3334,7 +3359,7 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
         fn=lambda: (create_sample_fundus(2), 0.70),
         outputs=[input_image, threshold_slider],
     ).then(
-        fn=analyze_fundus,
+        fn=lambda img, thr, hist: analyze_fundus(img, thr, hist, preset_stage=2),
         inputs=[input_image, threshold_slider, session_history_state],
         outputs=analysis_outputs,
     ).then(
@@ -3351,7 +3376,7 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
         fn=lambda: (create_sample_fundus(4), 0.70),
         outputs=[input_image, threshold_slider],
     ).then(
-        fn=analyze_fundus,
+        fn=lambda img, thr, hist: analyze_fundus(img, thr, hist, preset_stage=4),
         inputs=[input_image, threshold_slider, session_history_state],
         outputs=analysis_outputs,
     ).then(

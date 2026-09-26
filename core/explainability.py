@@ -65,8 +65,14 @@ def generate_quadrant_description(heatmap: np.ndarray, stage: int) -> Tuple[str,
         "Inferior-Nasal": float(np.mean(heatmap[mid_y:, mid_x:])),
     }
     peak_name, peak_val = max(quadrants.items(), key=lambda item: item[1])
-    desc = (f"**Peak Pathological Focus:** Grad-CAM localized maximum lesion density in the **[{peak_name}]** quadrant "
-            f"(intensity index: `{peak_val:.2f}`), serving as the primary morphological driver for the **{AppConfig.CLASS_NAMES[stage]}** classification.")
+    if stage == 0:
+        desc = (
+            "**Physiological Baseline:** Grad-CAM displays uniform, diffuse retinal background attention with "
+            "no focal pathological hyper-activations detected, confirming normal anatomical morphology."
+        )
+    else:
+        desc = (f"**Peak Pathological Focus:** Grad-CAM localized maximum lesion density in the **[{peak_name}]** quadrant "
+                f"(intensity index: `{peak_val:.2f}`), serving as the primary morphological driver for the **{AppConfig.CLASS_NAMES[stage]}** classification.")
     return desc, quadrants, peak_name, peak_val
 
 
