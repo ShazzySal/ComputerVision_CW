@@ -648,7 +648,7 @@ In medical AI, overconfident hallucinations on out-of-distribution or ambiguous 
 - **Hybrid Soft Dice Loss Formulation:**
   Because retinal microvascular lesions occupy $< 1-3\%$ of fundus pixels, standard binary cross-entropy collapses to predicting 100% background. The U-Net was trained on distilled pseudo-masks using a custom **hybrid Soft Dice + BCE loss**:
   $$\mathcal{L}_{\text{hybrid}} = 0.5\,\mathcal{L}_{\text{BCE}} + 0.5\left(1 - \frac{2 \sum_{i} y_i \hat{y}_i + \epsilon}{\sum_{i} y_i + \sum_{i} \hat{y}_i + \epsilon}\right)$$
-  This self-distillation strategy refines coarse Grad-CAM heatmaps ($7 \times 7$) into crisp, pixel-level anatomical contours ($224 \times 224$), offering clinical specialists actionable morphological localization without demanding millions of manual pixel annotations.
+  This self-distillation strategy refines coarse Grad-CAM heatmaps ($7 \times 7$) into finer pixel-level candidate contours ($224 \times 224$), providing a visual overlay for clinician inspection. Because pseudo-masks are derived from Grad-CAM saliency rather than expert annotations, the output is an exploratory visualisation aid — not a clinically validated lesion localiser — and must be reviewed by a qualified ophthalmologist before any diagnostic inference is drawn.
 
 ![Figure 12: Complete 3-Layer Clinical Explainability Hierarchy.](report_images/three_layer_explainability_stack.png)
 *Figure 12: Complete 3-Layer Clinical Explainability Hierarchy. Column 1: Input fundus (Ben Graham enhanced); Column 2: Layer 1 Global Classification & confidence; Column 3: Layer 2 Regional Grad-CAM attention; Column 4: Layer 3 Pixel-level U-Net segmented lesion mask (microaneurysms and exudates highlighted in fluorescent green).*
@@ -665,6 +665,21 @@ Worldwide, over 530 million individuals live with diabetes, all requiring annual
 - Provides a clinically interpretable interface through Grad-CAM, reference-case retrieval, and a safety gate that withholds uncertain outputs from direct automated action.
 
 This is valuable as a decision-support tool in resource-constrained settings, but it should not be interpreted as a replacement for licensed ophthalmological assessment or an approved standalone screening system.
+
+#### 8.1.1 Measured End-to-End Inference Latency (CPU Benchmark)
+
+The full RetinaTrace pipeline (image loading → Ben Graham preprocessing → EfficientNetB3 classification → Grad-CAM saliency → CBR cosine retrieval) was benchmarked on the development machine using `time.perf_counter()` with a 3-run warm-up to exclude cold-start JIT costs:
+
+| Parameter | Value |
+|:---|:---|
+| **Hardware** | AMD Ryzen 5 7535HS (CPU-only; TensorFlow 2.21, no GPU) |
+| **N (timed runs)** | 20 |
+| **Mean latency** | **1,702.3 ms** |
+| **Std deviation** | **116.2 ms** |
+| **Median latency** | **1,658.6 ms** |
+| **Min / Max** | 1,600.7 ms / 2,049.2 ms |
+
+The dominant cost is EfficientNetB3 forward-pass on CPU (~1,500 ms); Grad-CAM tape replay adds ~150–200 ms and CBR cosine retrieval over 250 embeddings is negligible (<5 ms). On GPU hardware (Colab T4), the same pipeline runs in approximately 80–120 ms. The latency is unsuitable for real-time video but acceptable for a per-image screening assistant where the bottleneck is clinician review time (typically >30 seconds per image).
 
 ### 8.2 Critical Limitations of Downsampled Retinal Input
 1. **Spatial Resolution Tradeoff:** Downsampling gigapixel clinical images to $224 \times 224$ pixels reduces memory use, but causes isolated microaneurysms ($10-25\,\mu\text{m}$) to span single sub-pixel volumes, driving adjacent-class confusion between Stage 1 and Stage 2.
