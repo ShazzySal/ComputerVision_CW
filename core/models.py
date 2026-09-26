@@ -78,6 +78,75 @@ def build_auxiliary_unet():
     return model
 
 
+def build_deep_clinical_unet(input_shape: tuple = (AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3)) -> keras.Model:
+    """Construct a full 4-level deep U-Net architecture with multi-scale skip connections.
+    
+    Architectural Specification:
+    - 4-Stage Hierarchical Encoder: (32 -> 64 -> 128 -> 256 filters)
+    - Double-convolution blocks with Batch Normalization and ReLU activations
+    - Latent Bottleneck: 512 filters with Spatial Dropout (rate=0.40)
+    - 4-Stage Transposed Convolution Decoder with matching skip connections
+    - Sigmoid 1x1 output layer for pixel-level binary lesion segmentation
+    """
+    def double_conv_block(x, filters, name_prefix):
+        x = layers.Conv2D(filters, (3, 3), padding="same", name=f"{name_prefix}_conv1")(x)
+        x = layers.BatchNormalization(name=f"{name_prefix}_bn1")(x)
+        x = layers.Activation("relu", name=f"{name_prefix}_relu1")(x)
+        x = layers.Conv2D(filters, (3, 3), padding="same", name=f"{name_prefix}_conv2")(x)
+        x = layers.BatchNormalization(name=f"{name_prefix}_bn2")(x)
+        x = layers.Activation("relu", name=f"{name_prefix}_relu2")(x)
+        return x
+
+    inputs = keras.Input(shape=input_shape, name="fundus_image_input")
+
+    # ── 4-Stage Encoder ─────────────────────────────────────────────
+    # Stage 1: 224x224
+    c1 = double_conv_block(inputs, 32, "enc1")
+    p1 = layers.MaxPooling2D((2, 2), name="enc1_pool")(c1)  # 112x112
+
+    # Stage 2: 112x112
+    c2 = double_conv_block(p1, 64, "enc2")
+    p2 = layers.MaxPooling2D((2, 2), name="enc2_pool")(c2)  # 56x56
+
+    # Stage 3: 56x56
+    c3 = double_conv_block(p2, 128, "enc3")
+    p3 = layers.MaxPooling2D((2, 2), name="enc3_pool")(c3)  # 28x28
+
+    # Stage 4: 28x28
+    c4 = double_conv_block(p3, 256, "enc4")
+    p4 = layers.MaxPooling2D((2, 2), name="enc4_pool")(c4)  # 14x14
+
+    # ── Latent Bottleneck (14x14) ───────────────────────────────────
+    b = double_conv_block(p4, 512, "bottleneck")
+    b = layers.Dropout(0.40, name="bottleneck_dropout")(b)
+
+    # ── 4-Stage Decoder with Skip Connections ───────────────────────
+    # Stage 4 Up: 14x14 -> 28x28
+    u4 = layers.Conv2DTranspose(256, (2, 2), strides=(2, 2), padding="same", name="dec4_up")(b)
+    cat4 = layers.concatenate([u4, c4], name="dec4_concat")
+    d4 = double_conv_block(cat4, 256, "dec4")
+
+    # Stage 3 Up: 28x28 -> 56x56
+    u3 = layers.Conv2DTranspose(128, (2, 2), strides=(2, 2), padding="same", name="dec3_up")(d4)
+    cat3 = layers.concatenate([u3, c3], name="dec3_concat")
+    d3 = double_conv_block(cat3, 128, "dec3")
+
+    # Stage 2 Up: 56x56 -> 112x112
+    u2 = layers.Conv2DTranspose(64, (2, 2), strides=(2, 2), padding="same", name="dec2_up")(d3)
+    cat2 = layers.concatenate([u2, c2], name="dec2_concat")
+    d2 = double_conv_block(cat2, 64, "dec2")
+
+    # Stage 1 Up: 112x112 -> 224x224
+    u1 = layers.Conv2DTranspose(32, (2, 2), strides=(2, 2), padding="same", name="dec1_up")(d2)
+    cat1 = layers.concatenate([u1, c1], name="dec1_concat")
+    d1 = double_conv_block(cat1, 32, "dec1")
+
+    # Final pixel-wise probability mask
+    outputs = layers.Conv2D(1, (1, 1), activation="sigmoid", name="lesion_segmentation_output")(d1)
+
+    return keras.Model(inputs=inputs, outputs=outputs, name="RetinaTrace_Deep_Clinical_UNet")
+
+
 def load_reference_embeddings():
     """Load a structurally valid embedding library, even if gallery images are unavailable."""
     if os.path.exists(AppConfig.EMBEDDINGS_PATH):
