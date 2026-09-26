@@ -44,6 +44,18 @@ from core.agents import run_pipeline
 _CLINICAL_KB: List[Dict[str, Any]] = [
     # ── DR Stage Descriptions ─────────────────────────────────────────────────
     {
+        "keys": ["what are the stages", "stages of diabetic retinopathy", "dr stages", "stages", "grades"],
+        "reply": (
+            "**Diabetic Retinopathy Stages**\n\n"
+            "- **Stage 0 — No DR:** No visible signs of diabetic retinopathy.\n"
+            "- **Stage 1 — Mild NPDR:** Small changes such as microaneurysms may be present.\n"
+            "- **Stage 2 — Moderate NPDR:** More retinal changes, including bleeding or leakage, may appear.\n"
+            "- **Stage 3 — Severe NPDR:** There are more widespread changes and a higher risk of progression.\n"
+            "- **Stage 4 — Proliferative DR:** New, fragile blood vessels may grow and require urgent specialist review.\n\n"
+            "A qualified eye specialist should confirm the stage and recommend follow-up."
+        ),
+    },
+    {
         "keys": ["stage 0", "no dr", "normal", "healthy"],
         "reply": (
             "**Stage 0 — No Diabetic Retinopathy (No DR)**\n\n"
@@ -495,6 +507,143 @@ def generate_report_json(stage_name: str, confidence: float, probabilities: dict
     return tmp.name
 
 
+def generate_document_pdf(title: str, body: str, images: Optional[List[Tuple[str, Any]]] = None) -> str:
+    """Create a clean, printable PDF copy of a generated clinical document."""
+    if not body or not str(body).strip():
+        return None
+    from html import escape as _escape
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Image as ReportLabImage
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+
+    filename = _tempfile.NamedTemporaryFile(delete=False, suffix="_retinatrace.pdf").name
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "DocumentTitle", parent=styles["Title"], alignment=TA_CENTER,
+        fontName="Helvetica-Bold", fontSize=15, leading=19, spaceAfter=5,
+    )
+    body_style = ParagraphStyle(
+        "DocumentBody", parent=styles["BodyText"], fontName="Helvetica",
+        fontSize=9.2, leading=13, spaceAfter=3,
+    )
+    section_style = ParagraphStyle(
+        "DocumentSection", parent=body_style, fontName="Helvetica-Bold",
+        textColor="#0f766e", spaceBefore=6, spaceAfter=4,
+    )
+    footer_style = ParagraphStyle(
+        "DocumentFooter", parent=styles["BodyText"], fontSize=7.5,
+        textColor="#64748b", spaceBefore=10,
+    )
+    document = SimpleDocTemplate(
+        filename, pagesize=A4, rightMargin=18 * mm, leftMargin=18 * mm,
+        topMargin=16 * mm, bottomMargin=16 * mm,
+        title=title, author="RetinaTrace AI",
+    )
+    story = [Paragraph(_escape(title), title_style), Spacer(1, 4)]
+    for line in str(body).splitlines():
+        clean_line = line.strip()
+        if not clean_line:
+            story.append(Spacer(1, 4))
+        elif clean_line.startswith("="):
+            story.append(Paragraph("<font color='#cbd5e1'>" + _escape(clean_line) + "</font>", body_style))
+        elif ":" not in clean_line and clean_line.isupper() and len(clean_line) < 45:
+            story.append(Paragraph(_escape(clean_line), section_style))
+        elif ":" in clean_line:
+            label, value = clean_line.split(":", 1)
+            story.append(Paragraph(
+                f"<b>{_escape(label.strip())}:</b> {_escape(value.strip())}", body_style
+            ))
+        else:
+            story.append(Paragraph(_escape(clean_line), body_style))
+    temporary_images = []
+    for label, source in images or []:
+        if source is None:
+            continue
+        try:
+            from PIL import Image as PILImage
+            image_array = np.asarray(source)
+            if image_array.dtype != np.uint8:
+                image_array = np.clip(image_array * (255.0 if image_array.max() <= 1.0 else 1.0), 0, 255).astype(np.uint8)
+            if image_array.ndim == 2:
+                image_array = np.repeat(image_array[:, :, None], 3, axis=2)
+            image_path = _tempfile.NamedTemporaryFile(delete=False, suffix="_retinatrace_visual.png").name
+            PILImage.fromarray(image_array[:, :, :3]).save(image_path)
+            temporary_images.append(image_path)
+            image = PILImage.open(image_path)
+            image_width = 170 * mm
+            image_height = min(85 * mm, image_width * image.height / max(image.width, 1))
+            story.extend([
+                Spacer(1, 8),
+                Paragraph(_escape(label), section_style),
+                ReportLabImage(image_path, width=image_width, height=image_height),
+            ])
+        except (TypeError, ValueError, OSError):
+            continue
+    story.append(Paragraph(
+        "Generated by RetinaTrace AI. Review with a qualified ophthalmologist before clinical use.",
+        footer_style,
+    ))
+    try:
+        document.build(story)
+    finally:
+        for image_path in temporary_images:
+            try:
+                os.remove(image_path)
+            except OSError:
+                pass
+    return filename
+
+
+def generate_full_report_pdf(stage_name: str, confidence: float, probabilities: dict,
+                             advisory_urgency: str, advisory_followup: str,
+                             advisory_plan: str, ehr_text: str,
+                             research_support: Optional[dict] = None,
+                             original_image: Any = None, cam_image: Any = None,
+                             lesion_image: Any = None) -> str:
+    """Create a formatted PDF containing the complete diagnostic report."""
+    if not stage_name or not probabilities or not ehr_text:
+        return None
+    probability_lines = "\n".join(
+        f"{label}: {value * 100:.2f}%" for label, value in probabilities.items()
+    )
+    visual_support = research_support or {}
+    visual_lines = (
+        f"Available: {visual_support.get('available', False)}\n"
+        f"Attention/lesion overlap: {visual_support.get('attention_lesion_iou', 0.0):.3f}\n"
+        f"Lesion burden: {visual_support.get('lesion_burden_pct', 0.0):.2f}%\n"
+        f"Vessel density: {visual_support.get('vessel_density_pct', 0.0):.2f}%\n"
+        f"Affected areas: {visual_support.get('affected_quadrants', 0)}/4\n"
+        f"Evidence consistency: {visual_support.get('prediction_evidence_consistency', 'Unavailable')}"
+    )
+    ehr_lines = ehr_text.splitlines()
+    ehr_body = "\n".join(ehr_lines[2:]) if len(ehr_lines) > 2 else ehr_text
+    report_body = (
+        "DIAGNOSIS\n"
+        f"Predicted stage: {stage_name}\n"
+        f"Model confidence: {confidence * 100:.2f}%\n"
+        "\nPROBABILITY BREAKDOWN\n"
+        f"{probability_lines}\n"
+        "\nCLINICAL ADVISORY\n"
+        f"Urgency: {advisory_urgency}\n"
+        f"Recommended follow-up: {advisory_followup}\n"
+        f"Action plan: {advisory_plan}\n"
+        "\nVISUAL SUPPORT\n"
+        f"{visual_lines}\n"
+        "\nCLINICAL SESSION NOTE\n"
+        f"{ehr_body}\n"
+        "==========================================================="
+    )
+    report_images = [
+        ("Uploaded fundus image", original_image),
+        ("Grad-CAM attention visual", cam_image),
+        ("U-Net lesion visual", lesion_image),
+    ]
+    return generate_document_pdf("RetinaTrace Full Diagnostic Report", report_body, report_images)
+
+
 def calculate_multimodal_risk(stage: int = 2, hba1c: float = 7.5, duration_years: float = 10.0, age: float = 55.0, systolic_bp: float = 135.0, diabetes_type: str = "Type 2") -> Tuple[str, str]:
     """Computes evidence-based 10-year vision loss progression risk and NHS hospital triage dispatch routing (UKPDS/WESDR)."""
     try:
@@ -645,20 +794,20 @@ def calculate_multimodal_risk(stage: int = 2, hba1c: float = 7.5, duration_years
     """
 
     referral_ticket = (
+        "RETINATRACE AI | DIGITAL REFERRAL TICKET\n"
         "===========================================================\n"
-        "           OFFICIAL DIGITAL HOSPITAL REFERRAL TICKET       \n"
-        "===========================================================\n"
-        f"TRIAGE PRIORITY CODE  : {triage_code}\n"
-        f"REFERRAL FACILITY     : {facility}\n"
-        f"MANDATORY WAIT TIME   : {wait_time}\n"
-        f"DIAGNOSTIC IMAGE STAGE: Stage {stage} ({AppConfig.CLASS_NAMES[stage]})\n"
-        f"10-YEAR RISK ESTIMATE : {risk_pct:.1f}% ({risk_label})\n"
-        "-----------------------------------------------------------\n"
-        f"PATIENT PARAMETERS    : Age {age:.0f}y | {diabetes_type} | HbA1c {hba1c:.1f}% | Duration {duration_years:.0f}y | BP {systolic_bp:.0f} mmHg\n"
-        f"CLINICAL ACTION PLAN  : {protocol}\n"
-        "-----------------------------------------------------------\n"
-        "REFERRING CLINICIAN SIGN-OFF:\n"
-        "Clinician Name: _________________   Medical Reg: __________\n"
+        "ROUTING\n"
+        f"Priority                : {triage_code}\n"
+        f"Referral facility       : {facility}\n"
+        f"Recommended timeframe  : {wait_time}\n"
+        f"Image stage             : Stage {stage} ({AppConfig.CLASS_NAMES[stage]})\n"
+        f"Estimated 10-year risk : {risk_pct:.1f}% ({risk_label})\n"
+        "\nPATIENT DETAILS\n"
+        f"Age {age:.0f}y | {diabetes_type} | HbA1c {hba1c:.1f}% | Diabetes duration {duration_years:.0f}y | BP {systolic_bp:.0f} mmHg\n"
+        "\nRECOMMENDED ACTION\n"
+        f"{protocol}\n"
+        "\nCLINICIAN SIGN-OFF\n"
+        "Clinician name: _________________   Medical Reg: __________\n"
         "Signature: ______________________   Date: _________________\n"
         "==========================================================="
     )
@@ -960,23 +1109,23 @@ def analyze_fundus(img: Optional[np.ndarray], threshold: float, session_history:
     clean_quad = expl['quadrant_desc'].replace('**', '').replace('`', '')
     gate_label = 'OVERRIDE (FLAGGED)' if flagged else 'APPROVED'
     ehr_text = (
+        "RETINATRACE AI | CLINICAL SESSION NOTE\n"
         "===========================================================\n"
-        "           RETINATRACE AI CLINICAL TRIAGE NOTE             \n"
-        "===========================================================\n"
-        f"ASSESSMENT DATE/TIME   : Diagnostic Session Active\n"
-        f"PREDICTED DR STAGE     : Stage {stage} — {diag['stage_name']}\n"
-        f"MODEL CONFIDENCE       : {diag['confidence']*100:.2f}%\n"
-        f"GOVERNANCE GATE STATUS : {gate_label}\n"
-        f"SAFETY THRESHOLD ENF.  : {threshold*100:.0f}%\n"
-        f"PEAK ANATOMICAL REGION : {clean_quad}\n"
-        f"EXPERIMENTAL CV SUPPORT : Lesion/attention IoU {overlap.get('iou', 0.0):.3f} | Vessel density {expl.get('vessel_density', 0.0):.2f}% | Affected quadrants {expl.get('affected_quadrants_count', 0)}/4\n"
-        f"EVIDENCE CONSISTENCY    : {consistency.get('status', 'INSUFFICIENT EVIDENCE')}\n"
-        "-----------------------------------------------------------\n"
-        f"CLINICAL URGENCY       : {adv['urgency']}\n"
-        f"RECOMMENDED RECALL     : {adv['followup']}\n"
-        f"ACTION PLAN            : {adv['plan']}\n"
-        "-----------------------------------------------------------\n"
-        "REVIEWING OPHTHALMOLOGIST SIGN-OFF:\n"
+        "ASSESSMENT\n"
+        f"Date / time             : Diagnostic session active\n"
+        f"Predicted DR stage      : Stage {stage} - {diag['stage_name']}\n"
+        f"Model confidence        : {diag['confidence']*100:.2f}%\n"
+        f"Evidence consistency    : {consistency.get('status', 'INSUFFICIENT EVIDENCE')}\n"
+        f"Main retinal area       : {clean_quad}\n"
+        "\nSAFETY REVIEW\n"
+        f"Governance status       : {gate_label}\n"
+        f"Safety threshold        : {threshold*100:.0f}%\n"
+        f"Visual support          : IoU {overlap.get('iou', 0.0):.3f} | Vessel density {expl.get('vessel_density', 0.0):.2f}% | Affected areas {expl.get('affected_quadrants_count', 0)}/4\n"
+        "\nCARE PLAN\n"
+        f"Urgency                : {adv['urgency']}\n"
+        f"Recommended follow-up  : {adv['followup']}\n"
+        f"Action plan            : {adv['plan']}\n"
+        "\nCLINICIAN SIGN-OFF\n"
         "Name: ______________________   Signature: __________________\n"
         "==========================================================="
     )
@@ -1329,7 +1478,7 @@ html, body {
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    background-color: #f8fafc !important;
+    background-color: #edf3f8 !important;
     color: #0f172a !important;
     transition: background-color 0.25s ease, color 0.25s ease;
 }
@@ -1338,7 +1487,11 @@ html, body {
     color: #f8fafc !important;
 }
 
+#root,
+#app,
 gradio-app {
+    margin: 0 !important;
+    padding: 0 !important;
     overflow-x: hidden !important;
     max-width: 100% !important;
     width: 100% !important;
@@ -1347,8 +1500,66 @@ gradio-app {
 
 .gradio-container {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    background-color: #edf3f8 !important;
     transition: background-color 0.3s ease, color 0.3s ease;
     box-sizing: border-box !important;
+    margin: 0 auto !important;
+    padding: 0 12px 12px !important;
+}
+
+html.dark .gradio-container,
+body.dark .gradio-container,
+gradio-app.dark .gradio-container,
+.dark .gradio-container {
+    background-color: #0b1120 !important;
+    color: #f8fafc !important;
+}
+
+.row,
+.gr-row {
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.column,
+.gr-column {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+}
+
+.row > .column:first-child,
+.gradio-container .gr-row > div:first-child,
+.row > .column:last-child,
+.gradio-container .gr-row > div:last-child {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+    min-width: 0 !important;
+}
+
+@media (min-width: 901px) {
+    #root,
+    #app,
+    gradio-app {
+        margin-left: 240px !important;
+        width: calc(100% - 240px) !important;
+        max-width: calc(100% - 240px) !important;
+    }
+}
+
+.gradio-container > .main,
+.gradio-container > .main > .wrap,
+#component-0 {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    gap: 0 !important;
 }
 
 /* Header Telemetry Styling */
@@ -1424,6 +1635,21 @@ gradio-app {
     border: 1px solid #334155;
     box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     color: #f1f5f9;
+}
+.clinical-document-box textarea {
+    min-height: 260px !important;
+    font-family: Georgia, "Times New Roman", serif !important;
+    font-size: 13px !important;
+    line-height: 1.55 !important;
+    white-space: pre-wrap !important;
+    background: #f8fafc !important;
+    color: #1e293b !important;
+    border-color: #cbd5e1 !important;
+}
+.dark .clinical-document-box textarea {
+    background: #1e293b !important;
+    color: #f1f5f9 !important;
+    border-color: #475569 !important;
 }
 
 .card-header {
@@ -2172,8 +2398,8 @@ gradio-app {
 .rg-floating-chat-pill {
     position: fixed !important;
     right: 24px !important;
-    bottom: 24px !important;
-    z-index: 99999 !important;
+    bottom: 18px !important;
+    z-index: 200000 !important;
     background: linear-gradient(135deg, #0d9488, #0284c7) !important;
     color: #ffffff !important;
     padding: 10px 18px !important;
@@ -2187,6 +2413,8 @@ gradio-app {
     gap: 8px !important;
     transition: transform 0.15s ease, box-shadow 0.15s ease !important;
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 .rg-floating-chat-pill:hover {
     transform: translateY(-2px) !important;
@@ -2197,17 +2425,21 @@ gradio-app {
 .rg-chat-floating-panel {
     position: fixed !important;
     right: 24px !important;
-    bottom: 82px !important;
-    z-index: 99998 !important;
+    bottom: 66px !important;
+    z-index: 100000 !important;
     width: min(560px, calc(100vw - 48px)) !important;
-    height: min(680px, calc(100vh - 118px)) !important;
-    overflow: hidden !important;
-    padding: 18px 20px 20px !important;
+    height: auto !important;
+    max-height: min(620px, calc(100vh - 110px)) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding: 14px 16px 14px !important;
     background: #ffffff !important;
     border: 1px solid #cbd5e1 !important;
     border-radius: 14px !important;
     box-shadow: 0 18px 50px rgba(15, 23, 42, 0.28) !important;
     animation: rg-chat-panel-in 0.18s ease-out !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 .dark .rg-chat-floating-panel {
     background: #102a43 !important;
@@ -2247,20 +2479,154 @@ gradio-app {
     min-height: 0 !important;
     overflow-y: auto !important;
     overscroll-behavior: contain !important;
+    max-height: 170px !important;
 }
 .rg-chat-floating-panel .rg-chat-input-row {
-    align-items: stretch !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 88px !important;
+    align-items: center !important;
     gap: 8px !important;
+    margin-top: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
 }
 .rg-chat-floating-panel .rg-chat-input-row > div,
 .rg-chat-floating-panel .rg-chat-input-row button {
-    align-self: stretch !important;
+    align-self: center !important;
+}
+.rg-chat-floating-panel .rg-chat-input-row > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+}
+.rg-chat-floating-panel .rg-chat-input-row > div:last-child {
+    width: 88px !important;
+    max-width: 88px !important;
+}
+.rg-chat-floating-panel .rg-chat-input-row button {
+    width: 88px !important;
+    min-height: 46px !important;
+    height: 46px !important;
 }
 .rg-chat-floating-panel .rg-chat-input-row textarea,
 .rg-chat-floating-panel .rg-chat-input-row button {
-    min-height: 50px !important;
-    height: 50px !important;
+    min-height: 46px !important;
+    height: 46px !important;
     box-sizing: border-box !important;
+}
+.gradio-container .rg-chat-input-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 88px !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+.gradio-container .rg-chat-input-row > div:first-child {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+}
+.gradio-container .rg-chat-input-row > div:last-child {
+    width: 88px !important;
+    max-width: 88px !important;
+    min-width: 88px !important;
+    flex: 0 0 88px !important;
+}
+.gradio-container .rg-chat-input-row button {
+    width: 88px !important;
+    min-width: 88px !important;
+    min-height: 46px !important;
+    height: 46px !important;
+    align-self: center !important;
+}
+.rg-chat-input-row,
+.rg-chat-input-row.row,
+.rg-chat-input-row.gr-row,
+.rg-chat-input-row > .row,
+.rg-chat-input-row > .gr-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 88px !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+.rg-chat-input-row > div,
+.rg-chat-input-row > .row > div,
+.rg-chat-input-row > .gr-row > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+}
+.rg-chat-input-row > div:last-child,
+.rg-chat-input-row > .row > div:last-child,
+.rg-chat-input-row > .gr-row > div:last-child {
+    width: 88px !important;
+    max-width: 88px !important;
+    min-width: 88px !important;
+    flex: 0 0 88px !important;
+}
+.rg-chat-input-row button,
+.rg-chat-input-row > .row button,
+.rg-chat-input-row > .gr-row button {
+    width: 88px !important;
+    min-width: 88px !important;
+    min-height: 46px !important;
+    height: 46px !important;
+    align-self: center !important;
+}
+.rg-history-floating-panel {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    z-index: 100000 !important;
+    width: min(560px, calc(100vw - 48px)) !important;
+    max-height: min(620px, calc(100vh - 110px)) !important;
+    overflow-y: auto !important;
+    padding: 14px 16px !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.28) !important;
+    transform: translate(-50%, -50%) !important;
+    animation: rg-history-panel-in 0.18s ease-out !important;
+}
+.dark .rg-history-floating-panel {
+    background: #102a43 !important;
+    border-color: #334155 !important;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5) !important;
+}
+.rg-history-floating-panel .rg-history-close {
+    float: right !important;
+    width: 30px !important;
+    height: 30px !important;
+    padding: 0 !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    color: #475569 !important;
+    font-size: 20px !important;
+    line-height: 1 !important;
+    cursor: pointer !important;
+}
+.dark .rg-history-floating-panel .rg-history-close {
+    border-color: #475569 !important;
+    color: #cbd5e1 !important;
+}
+@media (max-width: 700px) {
+    .rg-history-floating-panel {
+        width: calc(100vw - 20px) !important;
+        max-height: calc(100vh - 82px) !important;
+    }
+}
+@keyframes rg-history-panel-in {
+    from { opacity: 0; transform: translate(-50%, -46%) scale(0.98); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 @keyframes rg-chat-panel-in {
     from { opacity: 0; transform: translateY(10px) scale(0.98); }
@@ -2275,9 +2641,9 @@ gradio-app {
     width: 36px;
     height: 36px;
     border-radius: 8px;
-    background: #0f172a;
-    border: 1px solid #334155;
-    color: #38bdf8;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #0f766e;
     font-size: 19px;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -2285,8 +2651,8 @@ gradio-app {
     line-height: 1;
 }
 #rg-mobile-menu-btn:hover {
-    background: #1e293b;
-    border-color: #38bdf8;
+    background: #f1f5f9;
+    border-color: #0d9488;
 }
 .dark #rg-mobile-menu-btn {
     background: #0b1329;
@@ -2348,17 +2714,24 @@ gradio-app {
 }
 
 /* Quick samples row: perfectly balanced horizontal row */
-.quick-samples-row {
+.quick-samples-row,
+.quick-samples-row.row,
+.quick-samples-row.gr-row {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     gap: 6px !important;
+    width: 100% !important;
+    max-width: 100% !important;
     margin-top: 2px !important;
     margin-bottom: 4px !important;
 }
-.quick-samples-row > div {
+.quick-samples-row > div,
+.quick-samples-row > .column,
+.quick-samples-row > .gr-column {
     flex: 1 1 0 !important;
     min-width: 0 !important;
+    width: auto !important;
 }
 .quick-samples-row button {
     width: 100% !important;
@@ -2449,9 +2822,11 @@ gradio-app {
     }
     .rg-chat-floating-panel {
         right: 10px !important;
-        bottom: 68px !important;
+        bottom: 52px !important;
         width: calc(100vw - 20px) !important;
-        height: min(680px, calc(100vh - 92px)) !important;
+        height: auto !important;
+        max-height: min(680px, calc(100vh - 82px)) !important;
+        overflow: hidden !important;
         padding: 16px 12px 14px !important;
     }
 }
@@ -2570,6 +2945,16 @@ HEAD_SCRIPT = """
             return null;
         }
 
+        function scrollToTabPanel() {
+            if (!elemId) return;
+            const panel = document.getElementById(elemId);
+            if (!panel) return;
+            const tabPanel = panel.closest('[role="tabpanel"]') || panel;
+            try {
+                tabPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch(e) {}
+        }
+
         const target = findTabButton();
         if (target) {
             const overflowMenu = target.closest && target.closest('.overflow-dropdown');
@@ -2579,7 +2964,7 @@ HEAD_SCRIPT = """
                     target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
                 } catch(e) {}
                 setTimeout(function() {
-                    try { target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch(e) {}
+                    scrollToTabPanel();
                 }, 50);
             };
             if (overflowMenu && overflowMenu.classList.contains('hide')) {
@@ -2621,6 +3006,22 @@ HEAD_SCRIPT = """
         }
     };
 
+    function hideChatTabNavigation() {
+        document.querySelectorAll('button, [role="tab"]').forEach(function(button) {
+            if (button.closest && button.closest('#rg-sidebar')) return;
+            if ((button.textContent || '').toLowerCase().includes('ai clinical chatbot')) {
+                button.style.setProperty('display', 'none', 'important');
+            }
+        });
+    }
+    hideChatTabNavigation();
+    if (document.documentElement) {
+        new MutationObserver(hideChatTabNavigation).observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+        });
+    }
+
     window.retinaToggleSidebar = function(open) {
         const sb = document.getElementById('rg-sidebar');
         const bd = document.getElementById('rg-sidebar-backdrop');
@@ -2638,39 +3039,37 @@ HEAD_SCRIPT = """
 
     window.retinaToggleTheme = function() {
         const elApp = document.querySelector('gradio-app');
-        const isDark = document.documentElement.classList.contains('dark') 
-                    || document.body.classList.contains('dark')
-                    || (elApp && elApp.classList.contains('dark'));
         const targets = [document.documentElement, document.body];
         if (elApp) targets.push(elApp);
-        
-        if (isDark) {
-            targets.forEach(function(t) { t.classList.remove('dark'); });
-            try { localStorage.setItem('retinatrace_theme', 'light'); } catch(e) {}
-        } else {
-            targets.forEach(function(t) { t.classList.add('dark'); });
-            try { localStorage.setItem('retinatrace_theme', 'dark'); } catch(e) {}
-        }
+
+        const isDark = targets.some(function(t) { return t && t.classList.contains('dark'); });
+        const nextDark = !isDark;
+
+        targets.forEach(function(t) {
+            if (!t) return;
+            t.classList.toggle('dark', nextDark);
+        });
+
+        try { localStorage.setItem('retinatrace_theme', nextDark ? 'dark' : 'light'); } catch(e) {}
     };
 
     window.retinaSearch = function(query) {
         if (!query) return;
         const q = query.toLowerCase();
         const tabs = [
-            { text: 'Diagnostic Assessment', match: ['diag', 'result', 'stage', 'cam', 'grad', 'lesion', 'unet', 'vessel', 'optic'] },
-            { text: 'Case-Based Reasoning', match: ['cbr', 'case', 'similar', 'reference', 'embed'] },
-            { text: 'Clinical Management', match: ['care', 'protocol', 'ehr', 'plan', 'urgency', 'referral', 'note'] },
-            { text: 'Multimodal Triage', match: ['triage', 'risk', 'hba1c', 'simulator', 'progression', 'bp'] },
-            { text: 'AI Clinical Chatbot', match: ['chat', 'bot', 'assistant', 'ask', 'question', 'samd'] },
-            { text: 'Session Prediction', match: ['history', 'log', 'past', 'session'] },
-            { text: 'Image Comparison', match: ['report', 'json', 'download', 'compare', 'graham', 'preproc'] },
-            { text: 'Longitudinal Analysis', match: ['longitudinal', 'previous', 'current', 'delta', 'progression'] }
+            { text: 'Diagnostic Assessment', id: 'rg-tab-diag', match: ['diag', 'diagnosis', 'result', 'stage', 'cam', 'grad', 'lesion', 'unet', 'vessel', 'optic'] },
+            { text: 'Case-Based Reasoning', id: 'rg-tab-cbr', match: ['cbr', 'case', 'similar', 'reference', 'embed'] },
+            { text: 'Clinical Management', id: 'rg-tab-care', match: ['care', 'protocol', 'ehr', 'plan', 'urgency', 'referral', 'note'] },
+            { text: 'Multimodal Triage', id: 'rg-tab-triage', match: ['triage', 'risk', 'hba1c', 'simulator', 'progression', 'bp'] },
+            { text: 'Session Prediction', id: 'rg-tab-history', match: ['history', 'prediction', 'log', 'past', 'session'] },
+            { text: 'Image Comparison', id: 'rg-tab-compare', match: ['image', 'report', 'json', 'download', 'compare', 'graham', 'preproc'] },
+            { text: 'Longitudinal Analysis', id: 'rg-tab-longitudinal', match: ['longitudinal', 'previous', 'current', 'delta', 'progression'] }
         ];
         const found = tabs.find(function(t) {
             return t.match.some(function(m) { return q.includes(m); });
         });
         if (found) {
-            window.retinaOpenTab(found.text);
+            window.retinaOpenTab(found.text, null, found.id);
         }
     };
 
@@ -2697,7 +3096,6 @@ HEAD_SCRIPT = """
             }
             panel = panel && panel.getAttribute('role') === 'tabpanel' ? panel : chatTarget;
             panel.classList.add('rg-chat-floating-panel');
-            chatTarget.classList.add('rg-chat-floating-panel');
         }, 80);
     };
 
@@ -2709,10 +3107,47 @@ HEAD_SCRIPT = """
             panel = panel.parentElement;
         }
         if (panel) panel.classList.remove('rg-chat-floating-panel');
-        chatTarget.classList.remove('rg-chat-floating-panel');
         if (window.retinaChatPreviousTab) {
             window.retinaChatPreviousTab.click();
             window.retinaChatPreviousTab = null;
+        }
+    };
+
+    window.retinaToggleHistory = function(btnEl) {
+        const existingPanel = document.querySelector('[role="tabpanel"].rg-history-floating-panel');
+        if (existingPanel) {
+            window.retinaCloseHistory();
+            return;
+        }
+
+        window.retinaHistoryPreviousTab = Array.from(document.querySelectorAll('button, [role="tab"]'))
+            .find(function(btn) {
+                return !btn.closest('#rg-sidebar') && btn.getAttribute('aria-selected') === 'true';
+            });
+        window.retinaOpenTab('Session Prediction', btnEl, 'rg-tab-history');
+        setTimeout(function() {
+            const historyTarget = document.getElementById('rg-tab-history');
+            if (!historyTarget) return;
+            let panel = historyTarget;
+            while (panel && panel !== document.body && panel.getAttribute('role') !== 'tabpanel') {
+                panel = panel.parentElement;
+            }
+            panel = panel && panel.getAttribute('role') === 'tabpanel' ? panel : historyTarget;
+            panel.classList.add('rg-history-floating-panel');
+        }, 100);
+    };
+
+    window.retinaCloseHistory = function() {
+        const historyTarget = document.getElementById('rg-tab-history');
+        if (!historyTarget) return;
+        let panel = historyTarget;
+        while (panel && panel !== document.body && panel.getAttribute('role') !== 'tabpanel') {
+            panel = panel.parentElement;
+        }
+        if (panel) panel.classList.remove('rg-history-floating-panel');
+        if (window.retinaHistoryPreviousTab) {
+            window.retinaHistoryPreviousTab.click();
+            window.retinaHistoryPreviousTab = null;
         }
     };
 
@@ -2738,10 +3173,11 @@ HEAD_SCRIPT = """
     try {
         const savedTheme = localStorage.getItem('retinatrace_theme') || localStorage.getItem('retinaguard_theme');
         const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-            document.documentElement.classList.add('dark');
-            document.body.classList.add('dark');
-        }
+        const themeIsDark = savedTheme === 'dark' || savedTheme === 'light' ? savedTheme === 'dark' : true;
+        const targets = [document.documentElement, document.body, document.querySelector('gradio-app')].filter(Boolean);
+        targets.forEach(function(t) {
+            t.classList.toggle('dark', themeIsDark);
+        });
     } catch(e) {}
 })();
 </script>
@@ -2804,6 +3240,144 @@ else:
 RETINA_LOGO_IMG = f'<img src="{RETINA_LOGO_SRC}" alt="RetinaTrace" class="rt-logo-img" />' if RETINA_LOGO_SRC else """<svg viewBox="0 0 112 65" fill="#2e7d32" class="rt-logo-img"><path d="M 52 19 L 50 20 L 46 24 L 44 29 L 44 34 L 46 38 L 49 41 L 53 43 L 58 43 L 64 40 L 66 37 L 67 34 L 67 29 L 65 25 L 61 26 L 60 22 L 63 21 L 61 19 Z M 0 30 L 1 34 L 15 48 L 23 54 L 37 61 L 49 64 L 60 64 L 66 63 L 76 60 L 86 55 L 97 47 L 110 34 L 111 32 L 111 30 L 100 19 L 88 10 L 78 5 L 69 2 L 56 0 L 42 2 L 28 7 L 14 16 Z M 50 15 L 59 15 L 64 19 L 67 20 L 70 17 L 72 19 L 75 26 L 75 37 L 73 41 L 65 49 L 60 51 L 50 51 L 46 49 L 40 44 L 36 37 L 36 27 L 44 18 Z M 75 10 L 83 14 L 92 20 L 103 32 L 92 43 L 87 47 L 75 54 L 72 53 L 78 45 L 81 37 L 81 25 L 78 18 L 73 12 Z M 33 11 L 37 11 L 33 16 L 30 24 L 30 38 L 34 46 L 44 55 L 41 56 L 30 51 L 20 44 L 7 31 L 21 18 Z"/></svg>"""
 
 theme = gr.themes.Soft(primary_hue="teal", secondary_hue="slate")
+LAYOUT_CSS = """
+#root, #app, gradio-app {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+.gradio-container.gradio-container {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 12px 12px !important;
+    padding-top: 0 !important;
+}
+.gradio-container > .main.main,
+.gradio-container > .main > .wrap.wrap,
+.gradio-container > .main > .wrap > .contain,
+#component-0 {
+    margin-top: -24px !important;
+    padding-top: 0 !important;
+    gap: 0 !important;
+}
+footer,
+.footer,
+.gradio-container > footer,
+.gradio-container > .footer {
+    display: none !important;
+}
+.row,
+.gr-row {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    gap: 12px !important;
+}
+.row.quick-samples-row,
+.row.quick-samples-row.gr-row,
+.quick-samples-row,
+.quick-samples-row.gr-row {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+.row.quick-samples-row > button,
+.quick-samples-row > button {
+    flex: 1 1 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+.column,
+.gr-column {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+}
+.row > .column:first-child,
+.row > .column:last-child,
+.gradio-container .gr-row > div:first-child,
+.gradio-container .gr-row > div:last-child {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+}
+.action-row,
+.action-row.row,
+.action-row.gr-row {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    width: 100% !important;
+}
+.action-row > button,
+.action-row > div {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+}
+#rg-chat-input-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 88px !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+#rg-chat-input-row > div:first-child {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+}
+#rg-chat-input-row > div:last-child {
+    width: 88px !important;
+    max-width: 88px !important;
+    min-width: 88px !important;
+    flex: 0 0 88px !important;
+}
+#rg-chat-input-row button {
+    width: 88px !important;
+    min-width: 88px !important;
+    min-height: 46px !important;
+    height: 46px !important;
+    align-self: center !important;
+}
+@media (min-width: 901px) {
+    #root, #app, gradio-app {
+        margin-left: 240px !important;
+        width: calc(100% - 240px) !important;
+        max-width: calc(100% - 240px) !important;
+    }
+    .gradio-container.gradio-container {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 18px !important;
+        padding-right: 24px !important;
+    }
+}
+@media (max-width: 900px) {
+    #root, #app, gradio-app {
+        margin-left: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .gradio-container.gradio-container {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+}
+"""
 
 with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
     # Inject Custom Clinical Styling & Theme Detection
@@ -2831,7 +3405,7 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
         <div class="rg-sb-search-wrap">
             <div class="rg-sb-search">
                 <span style="font-size:12px; opacity:0.6;">🔍</span>
-                <input type="text" placeholder="Search features..." oninput="window.retinaSearch(this.value)" />
+                <input type="text" placeholder="Search features..." oninput="window.retinaSearch(this.value)" onkeydown="if (event.key === 'Enter') window.retinaSearch(this.value)" />
                 <span class="rg-kbd">⌘K</span>
             </div>
         </div>
@@ -2855,12 +3429,7 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
                 <span class="rg-sb-icon">🚦</span>
                 <span>Multimodal Triage</span>
             </button>
-            <button class="rg-sb-btn" onclick="window.retinaOpenTab('AI Clinical Chatbot', this, 'rg-tab-chat')" title="AI Clinical Chatbot">
-                <span class="rg-sb-icon">💬</span>
-                <span>AI Chatbot</span>
-                <span class="rg-badge">AAO</span>
-            </button>
-            <button class="rg-sb-btn" onclick="window.retinaOpenTab('Session Prediction', this, 'rg-tab-history')" title="Session Prediction History">
+            <button class="rg-sb-btn" onclick="window.retinaToggleHistory(this)" title="Session Prediction History">
                 <span class="rg-sb-icon">📜</span>
                 <span>Prediction History</span>
             </button>
@@ -2937,24 +3506,20 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
     """)
 
     gr.Markdown(
-        "> **Research prototype — not for clinical decisions.** The saved classifier "
-        "checkpoint predates the corrected EfficientNet input-scale pipeline and current "
-        "duplicate-safe split. Predictions from it are unvalidated; retraining and evaluation "
-        "are required before reporting model performance."
+        "> **Research prototype — not for clinical decisions.** This tool is still being tested, "
+        "and its results have not been fully verified. Do not use its predictions to make medical "
+        "decisions; always ask a qualified healthcare professional."
     )
 
-    # 2. Main Workspace (2 Columns)
+    # 2. Main Workspace (custom compact horizontal split)
     with gr.Row():
-        # Left Column: Upload & Governance Configuration
-        with gr.Column(scale=4):
+        with gr.Column(scale=5):
             input_image = gr.Image(label="📥 Upload Fundus Photo", type="numpy", height=180)
 
-            # ── Run & Reset buttons DIRECTLY under upload section ───────────
-            with gr.Row():
+            with gr.Row(elem_classes=["action-row"]):
                 submit_btn = gr.Button("🚀 Run Diagnostic Analysis", variant="primary", size="lg", scale=3, elem_classes=["action-btn"])
                 btn_clear = gr.Button("🔄 Reset", variant="secondary", size="lg", scale=1)
 
-            # Quick Preset Buttons (Single balanced row)
             gr.Markdown("<div style='font-size:11px; font-weight:700; color:#64748b; margin:3px 0 1px 0;'>⚡ QUICK-LOAD SAMPLES:</div>")
             with gr.Row(elem_classes=["quick-samples-row"]):
                 btn_normal = gr.Button("🟢 Normal", size="sm")
@@ -2978,17 +3543,13 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
                 diabetes_duration = gr.Slider(minimum=0, maximum=40, value=10, step=1, label="Duration of Diabetes (years)")
                 systolic_bp = gr.Slider(minimum=90, maximum=220, value=135, step=1, label="Systolic Blood Pressure (mmHg)")
 
-        # Right Column: Multi-Tab Clinical Dossier
-        with gr.Column(scale=6):
-            # Governance Status Banner (Appears at top of results when analysis runs)
-            status_banner = gr.HTML("")
-
+        with gr.Column(scale=7):
             # Structured Tabs
             with gr.Tabs():
                 # Tab 1: Primary Diagnosis & 3-Layer Explainability
                 with gr.TabItem("🏥 Diagnostic Assessment & Explainability", elem_id="rg-tab-diag"):
-                    uncertainty_banner_top = gr.HTML()
                     hero_diagnosis = gr.HTML()
+                    uncertainty_banner_top = gr.HTML()
                     prob_distribution = gr.Label(label="5-Stage Disease Probability Distribution (Softmax)", num_top_classes=5)
 
                     with gr.Accordion("🔬 Explainability & visual evidence", open=False):
@@ -3032,7 +3593,9 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
                 with gr.TabItem("📋 Clinical Management & EHR Note", elem_id="rg-tab-care"):
                     advisory_view = gr.HTML()
                     gr.Markdown("### 📄 Exportable Electronic Health Record (EHR) Summary Note")
-                    ehr_note_box = gr.Textbox(label="Clinical Session Note (Copy to Clipboard)", lines=12, interactive=False)
+                    ehr_note_box = gr.Textbox(label="Clinical Session Note", lines=12, interactive=False, elem_classes=["clinical-document-box"])
+                    ehr_pdf_btn = gr.Button("📄 Download Session Note (PDF)", variant="secondary", size="sm")
+                    ehr_pdf_file = gr.File(label="Session Note PDF", interactive=False)
 
                 # Tab 4: AI Clinical Chatbot & SaMD Guidelines
                 with gr.TabItem("💬 AI Clinical Chatbot", elem_id="rg-tab-chat"):
@@ -3041,14 +3604,18 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
                     ### 🤖 RetinaTrace Clinical Knowledge Assistant
                     Ask about diabetic retinopathy, the RetinaTrace model, or clinical guidelines.
                     """)
+                    gr.Markdown("**Quick Prompts:**")
+                    with gr.Row():
+                        chip_classify = gr.Button("Explain why this was classified", size="sm", variant="secondary")
+                        chip_rule421 = gr.Button("What is the 4-2-1 rule?", size="sm", variant="secondary")
                     with gr.Row():
                         with gr.Column(scale=3):
                             chatbot_widget = gr.Chatbot(
                                 label="Clinical Knowledge Assistant",
-                                height=420,
+                                height=180,
                                 value=[],
                             )
-                            with gr.Row(elem_classes=["rg-chat-input-row"]):
+                            with gr.Row(elem_id="rg-chat-input-row", elem_classes=["rg-chat-input-row"]):
                                 chat_input = gr.Textbox(
                                     placeholder="Ask a question about DR staging, the model, or clinical guidelines…",
                                     label="",
@@ -3057,13 +3624,6 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
                                 )
                                 chat_send_btn = gr.Button("Send", variant="primary", scale=1)
                             chat_clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
-                            gr.Markdown("**Quick Prompts:**")
-                            with gr.Row():
-                                chip_classify = gr.Button("Explain why this was classified", size="sm", variant="secondary")
-                                chip_rule421 = gr.Button("What is the 4-2-1 rule?", size="sm", variant="secondary")
-                            with gr.Row():
-                                chip_gradcam = gr.Button("How does Grad-CAM work?", size="sm", variant="secondary")
-                                chip_refer = gr.Button("When should I refer urgently?", size="sm", variant="secondary")
                         with gr.Column(scale=2, elem_classes=["rg-chat-specs"]):
                             gr.Markdown(r"""
                             ### ⚙️ System Specifications:
@@ -3090,11 +3650,15 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
                         label="Digital Hospital Referral Ticket (Copy to Clipboard / EMR Transfer)", 
                         value=initial_ticket_text,
                         lines=11, 
-                        interactive=False
+                        interactive=False,
+                        elem_classes=["clinical-document-box"],
                     )
+                    referral_pdf_btn = gr.Button("📄 Download Referral Ticket (PDF)", variant="secondary", size="sm")
+                    referral_pdf_file = gr.File(label="Referral Ticket PDF", interactive=False)
 
                 # Tab 6: Prediction History
                 with gr.TabItem("📜 Session Prediction History", elem_id="rg-tab-history"):
+                    gr.HTML('<button class="rg-history-close" onclick="window.retinaCloseHistory()" title="Close Prediction History">&times;</button>')
                     gr.Markdown("### 🕐 Prediction History — Current Session")
                     gr.Markdown("Each analysis run is logged here for comparison during the same session. History resets on page refresh.")
                     session_history_view = gr.HTML('<div style="color:#94a3b8; font-size:13px; padding:12px;">No predictions yet.</div>')
@@ -3109,9 +3673,9 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
                     quality_warning_view = gr.HTML('<div style="color:#94a3b8; font-size:12px;">Upload an image to see quality assessment.</div>')
                     gr.Markdown("---")
                     gr.Markdown("### 📥 Download Full Diagnosis Report")
-                    gr.Markdown("Downloads a structured JSON file containing the diagnosis, confidence, probabilities, advisory, and EHR note.")
-                    download_btn = gr.Button("⬇️ Generate & Download Report (JSON)", variant="primary")
-                    download_file = gr.File(label="Download", visible=False)
+                    gr.Markdown("Downloads a formatted PDF containing the diagnosis, confidence, probabilities, advisory, and clinical session note.")
+                    download_btn = gr.Button("⬇️ Generate & Download Report (PDF)", variant="primary")
+                    download_file = gr.File(label="Download PDF", visible=False)
 
                 with gr.TabItem("📊 Longitudinal Analysis", elem_id="rg-tab-longitudinal"):
                     gr.Markdown("### Optional Previous vs Current Examination Comparison")
@@ -3123,7 +3687,7 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
                     longitudinal_summary_view = gr.HTML("<div style='color:#64748b;'>Submit two images to begin.</div>")
                     longitudinal_diff_view = gr.Image(label="Registration/Difference Visualisation", type="numpy", height=240)
 
-
+            status_banner = gr.HTML("")
 
     # ─────────────────────────────────────────────────────────────────────────
     # 8. Event Connections
@@ -3190,13 +3754,25 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
     )
 
     download_btn.click(
-        fn=generate_report_json,
+        fn=generate_full_report_pdf,
         inputs=[_diag_stage_name_state, _diag_conf_state, prob_distribution,
-            _diag_urgency_state, _diag_followup_state, _diag_plan_state, ehr_note_box, research_support_state],
+            _diag_urgency_state, _diag_followup_state, _diag_plan_state, ehr_note_box,
+            research_support_state, input_image, overlay_cam_view, lesion_seg_view],
         outputs=[download_file],
     ).then(
         fn=lambda: gr.File(visible=True),
         outputs=[download_file],
+    )
+
+    ehr_pdf_btn.click(
+        fn=lambda body: generate_document_pdf("RetinaTrace Clinical Session Note", body),
+        inputs=[ehr_note_box],
+        outputs=[ehr_pdf_file],
+    )
+    referral_pdf_btn.click(
+        fn=lambda body: generate_document_pdf("RetinaTrace Digital Referral Ticket", body),
+        inputs=[referral_ticket_view],
+        outputs=[referral_pdf_file],
     )
 
     longitudinal_compare_btn.click(
@@ -3317,9 +3893,7 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
             _diag_followup_state,
             _diag_plan_state,
             quality_warning_view,
-            original_img_view,
-            download_file,
-        ],
+        ]
     )
 
     # Live threshold adjustment re-evaluates active prediction upon release
@@ -3413,8 +3987,6 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
     # -- Quick-Prompt Chip Handlers
     chip_classify.click(fn=lambda: 'Explain why this image was classified with the current DR stage.', outputs=[chat_input])
     chip_rule421.click(fn=lambda: 'What is the 4-2-1 rule in diabetic retinopathy?', outputs=[chat_input])
-    chip_gradcam.click(fn=lambda: 'How does Grad-CAM work and what does it highlight?', outputs=[chat_input])
-    chip_refer.click(fn=lambda: 'When should a patient be referred urgently to a retina specialist?', outputs=[chat_input])
 
     chat_send_btn.click(
         fn=respond_to_clinical_query,
@@ -3430,4 +4002,4 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
 
 
 if __name__ == "__main__":
-    demo.launch(head=HEAD_SCRIPT, theme=theme, share=True)
+    demo.launch(head=HEAD_SCRIPT, theme=theme, css=LAYOUT_CSS, share=True, server_port=8200)
