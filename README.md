@@ -1,5 +1,5 @@
 ---
-title: RetinaTrace AI - Diabetic Retinopathy Clinical Decision Support
+title: RetinaTrace AI - Diabetic Retinopathy Research Prototype
 emoji: 👁️
 colorFrom: teal
 colorTo: blue
@@ -8,10 +8,10 @@ sdk_version: "4.20"
 app_file: app.py
 pinned: false
 license: other
-short_description: Multi-agent DR staging with EfficientNetB3, Grad-CAM, U-Net & CBR
+short_description: Coursework prototype for diabetic-retinopathy image analysis
 ---
 
-# Diabetic Retinopathy Stage Detection: Multi-Agent Clinical Decision Support System
+# Diabetic Retinopathy Stage Detection: Coursework Research Prototype
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![TensorFlow](https://img.shields.io/badge/TensorFlow-2.15%2B-orange.svg)](https://tensorflow.org/)
@@ -30,24 +30,24 @@ short_description: Multi-agent DR staging with EfficientNetB3, Grad-CAM, U-Net &
 
 Diabetic Retinopathy (DR) is the leading cause of preventable blindness among working-age adults worldwide. Early detection and precise severity staging are critical: while early stages (Mild/Moderate NPDR) require monitoring and primary care glycemic optimization, advanced stages (Severe NPDR and Proliferative DR) demand urgent specialist laser photocoagulation or anti-VEGF pharmacotherapy to avert permanent visual loss.
 
-This coursework project presents an end-to-end, safety-critical computer vision and clinical decision support system for **multi-stage diabetic retinopathy grading** (ICDR Stages 0 to 4). Built on top of an **EfficientNetB3** convolutional neural network backbone with transfer learning, the system addresses real-world clinical deployment barriers through two core innovation features:
-1. **Embedding-Based Similar-Case Retrieval (Case-Based Reasoning)**: Inter-case comparative explainability via metric learning.
-2. **Multi-Agent Clinical Decision Pipeline**: Decoupling classification, spatial explainability, evidence-based protocol advisory, and an autonomous **Governance Safety Gate** that intercepts low-confidence predictions.
+This coursework project implements a research prototype for **five-class diabetic-retinopathy image analysis** (ICDR Stages 0 to 4), using an **EfficientNetB3** classifier and experimental explainability and retrieval components. It has not been clinically validated and is not intended for diagnosis or treatment decisions.
+1. **Embedding-Based Similar-Case Retrieval (Case-Based Reasoning):** Prototype retrieval using image embeddings.
+2. **Multi-Agent Decision Workflow:** Separate components for classification, visual explanations, advisory text, and a threshold-based low-confidence flag; this workflow does not enforce clinical review.
 
 ---
 
 ## 📊 Dataset Specification
 
 * **Dataset:** [Combined DR Dataset (APTOS + IDRiD + Messidor-2 + EyePACS subset)](https://www.kaggle.com/datasets/harsha1289/combined-dr-dataset-aptosidridmessidoreyepacs)
-* **Scale:** **38,034 digital retinal fundus photographs** (26,625 Train / 5,706 Val / 5,703 Test via leak-free `StratifiedGroupKFold`).
+* **Scale:** **38,034 downloaded image records** (21,000 in `train/`, 8,349 in `val/`, and 8,685 in `test/`). The duplicate-safe model partition is separate: 26,623 train / 5,706 validation / 5,705 test. The Kaggle description says approximately 21,000 images; see the report manifest for the measured folder counts and limitations.
 * **Disease Staging Hierarchy (International Clinical Diabetic Retinopathy Scale):**
-  * `Stage 0`: No DR (~25,411 images)
-  * `Stage 1`: Mild Non-Proliferative DR (NPDR) (~3,841 images)
-  * `Stage 2`: Moderate Non-Proliferative DR (NPDR) (~6,048 images)
-  * `Stage 3`: Severe Non-Proliferative DR (NPDR) (~1,483 images)
-  * `Stage 4`: Proliferative DR (PDR) (~1,251 images)
-* **Class Imbalance Handling:** The dataset exhibits a ~20:1 majority-to-minority imbalance ratio. This is addressed through a combination of GPU-side data augmentation and `sklearn.utils.class_weight.compute_class_weight("balanced")` applied across both training phases.
-* **Label Normalization:** Harmonizes heterogeneous naming conventions across source datasets (APTOS `diagnosis`, EyePACS `level`, IDRiD `DR_grade`) into standardized ICDR integers `[0, 4]`, with explicit validation against Messidor-2 4-level scale discrepancies.
+  * `Stage 0`: No DR (12,996 image records)
+  * `Stage 1`: Mild Non-Proliferative DR (NPDR) (5,825)
+  * `Stage 2`: Moderate NPDR (8,262)
+  * `Stage 3`: Severe NPDR (5,373)
+  * `Stage 4`: Proliferative DR (PDR) (5,578)
+* **Class Imbalance Handling:** The locally counted maximum-to-minimum class ratio is approximately 2.4:1. The notebook computes inverse-frequency class weights from training labels; no controlled with/without-weight performance comparison is currently reported.
+* **Label Scope:** The local `labels.csv` provides one record per file with a five-class diagnosis. It does not identify each record's source dataset, so per-source counts for the 38,034 local records cannot be verified from this copy.
 
 ---
 
@@ -69,8 +69,8 @@ Computer-Vision-CW/
 ├── requirements.txt                      # Complete pinned Python environment dependencies
 ├── README.md                             # Comprehensive technical documentation & reproduction guide
 ├── checkpoints/                          # Saved model weight checkpoints
-│   ├── best_phase1.weights.h5            # Frozen-base feature extraction checkpoint
-│   └── best_phase2.weights.h5            # Fine-tuned end-to-end model weights
+│   ├── best_phase1.weights.h5            # Historical frozen-base checkpoint
+│   └── best_phase2.weights.h5            # Historical fine-tuned checkpoint
 └── report_images/                        # Saved project figures, metrics, and logs
     ├── class_distribution.png            # Imbalance breakdown visualization
     ├── preprocessing_class*.png          # Ben Graham & border-crop comparison grids
@@ -84,10 +84,15 @@ Computer-Vision-CW/
 ```
 
   Research evidence utilities are documented in `research_evidence.md`. They run
-  outside the deployed application and never overwrite the production
-  `checkpoints/best_phase2.weights.h5` checkpoint. The ablation suite must be run
+  outside the deployed application and do not overwrite saved checkpoints. The
+  ablation suite must be run
   in the GPU notebook environment because the local workspace does not contain
   the full training dataset or an executed notebook kernel.
+
+> **Checkpoint status:** The saved checkpoints and reported EXP-03 metrics predate
+> the corrected EfficientNet input-scale adapter and do not use the current
+> duplicate-safe split. Retrain and evaluate before treating predictions from the
+> updated application as validated model results.
 
 ---
 

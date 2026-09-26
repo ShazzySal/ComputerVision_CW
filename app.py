@@ -135,8 +135,8 @@ _CLINICAL_KB: List[Dict[str, Any]] = [
             "**Auxiliary U-Net — Layer 3 Pixel-Level Lesion Segmentation**\n\n"
             "The U-Net predicts a pixel-level lesion probability map, which is visualized "
             "with highlighted candidate regions.\n\n"
-            "In the notebook training workflow, manual pixel masks were unavailable for the "
-            "38,034-image dataset, so pseudo-masks were generated from the green channel, "
+            "In the notebook training workflow, manual pixel masks were unavailable, so "
+            "pseudo-masks were generated from the green channel, "
             "Top-Hat and Black-Hat morphology, and Grad-CAM saliency above 0.35. These are "
             "synthetic training targets, not manual ground truth.\n\n"
             "The notebook trains the U-Net with a **Hybrid Soft Dice + BCE Loss**. In the "
@@ -180,7 +180,8 @@ _CLINICAL_KB: List[Dict[str, Any]] = [
             "using luminance thresholding (green channel > 7).\n"
             "2. **Ben Graham Enhancement:** Applies spatial frequency subtraction:\n"
             "   `I_norm = 4×I − 4×GaussianBlur(I, σ=10) + 128`\n"
-            "   This eliminates global illumination gradients and reveals micro-vascular detail.\n"
+            "   This suppresses low-frequency illumination variation and enhances local detail, "
+            "but may amplify noise in poor-quality images.\n"
             "3. **Resize:** All images standardized to 224×224 pixels.\n"
             "4. **Normalization:** Pixel values scaled to [0, 1] float32."
         ),
@@ -216,15 +217,17 @@ _CLINICAL_KB: List[Dict[str, Any]] = [
     {
         "keys": ["dataset", "data", "kaggle", "aptos", "idrid", "messidor", "eyepacs", "38034", "38,034"],
         "reply": (
-            "**Dataset — 38,034-Image Multi-Source Fundus Cohort**\n\n"
-            "RetinaTrace is trained on the **Combined DR Dataset** (Harsha, 2020) from Kaggle, "
-            "pooling four internationally recognized ophthalmic cohorts:\n\n"
-            "1. **APTOS 2019:** Rural Indian clinic screening, multi-camera variability.\n"
-            "2. **IDRiD:** Gold-standard Indian clinical staging with sub-lesion verification.\n"
-            "3. **Messidor-2:** European multi-hospital 3-CCD camera study.\n"
-            "4. **EyePACS Subset:** US population-scale real-world screening repository.\n\n"
-            "Total: **38,034 annotations** split 70/15/15 (Train/Val/Test) using "
-            "`StratifiedGroupKFold` with patient-level grouping to prevent bilateral eye leakage."
+            "**Dataset — Combined Fundus Image Records**\n\n"
+            "The project uses the **Combined DR Dataset** package (Harsha, 2020) from Kaggle. "
+            "Although the package describes multiple source cohorts, the local labels do not "
+            "identify the source dataset for each image, so per-source provenance cannot be "
+            "verified from this copy.\n\n"
+            "The downloaded package contains **38,034 image files** across its supplied folders. "
+            "The project creates a separate duplicate-safe model split; local labels do not identify "
+            "the source dataset for each record, and the Kaggle description and file count use "
+            "different reported scopes. The saved checkpoint predates the corrected input-scale "
+            "pipeline and duplicate-safe split; retraining and evaluation are required before "
+            "treating its predictions as validated results."
         ),
     },
 ]
@@ -2777,7 +2780,7 @@ RETINA_LOGO_IMG = f'<img src="{RETINA_LOGO_SRC}" alt="RetinaTrace" class="rt-log
 
 theme = gr.themes.Soft(primary_hue="teal", secondary_hue="slate")
 
-with gr.Blocks(title="RetinaTrace — Clinical Retinal Intelligence") as demo:
+with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
     # Inject Custom Clinical Styling & Theme Detection
     gr.HTML(CUSTOM_CSS)
 
@@ -2908,6 +2911,13 @@ with gr.Blocks(title="RetinaTrace — Clinical Retinal Intelligence") as demo:
     </div>
     """)
 
+    gr.Markdown(
+        "> **Research prototype — not for clinical decisions.** The saved classifier "
+        "checkpoint predates the corrected EfficientNet input-scale pipeline and current "
+        "duplicate-safe split. Predictions from it are unvalidated; retraining and evaluation "
+        "are required before reporting model performance."
+    )
+
     # 2. Main Workspace (2 Columns)
     with gr.Row():
         # Left Column: Upload & Governance Configuration
@@ -3032,10 +3042,10 @@ with gr.Blocks(title="RetinaTrace — Clinical Retinal Intelligence") as demo:
                         with gr.Column(scale=2, elem_classes=["rg-chat-specs"]):
                             gr.Markdown(r"""
                             ### ⚙️ System Specifications:
-                            * **Deep Learning Backbone:** EfficientNetB3 fine-tuned on **38,034** multi-source fundus images (APTOS + IDRiD + Messidor-2 + EyePACS).
-                            * **Ordinal Metric:** Evaluated via **Quadratic Weighted Kappa (QWK)** ($\kappa$) to quadratically penalize clinically dangerous multi-stage misclassifications.
-                            * **Active Safety Gate:** Autonomous `GovernanceAgent` intercepts low-confidence predictions and routes to mandatory human specialist triage.
-                            * **Regulatory Category:** SaMD (Software as a Medical Device) — Assistive Clinical Decision Support (FDA 21 CFR 860 / EU AI Act Class IIa).
+                            * **Deep Learning Backbone:** EfficientNetB3 with historical saved weights. The corrected input-scale pipeline and duplicate-safe split have not yet been retrained and evaluated.
+                            * **Ordinal Metric:** Historical EXP-03 results include Quadratic Weighted Kappa (QWK); they are not current final-split validation.
+                            * **Threshold Workflow Flag:** Low-confidence predictions are flagged for specialist review; the prototype cannot enforce a clinical referral.
+                            * **Intended Use:** Coursework prototype for research and demonstration only; not validated for clinical use.
                             """)
 
                 # Tab 5: Multimodal Clinical Triage & Risk Simulator

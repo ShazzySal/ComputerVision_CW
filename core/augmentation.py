@@ -1,8 +1,7 @@
-"""Data augmentation and dataset balancing pipeline for RetinaTrace AI.
+"""Optional NumPy augmentation utilities for RetinaTrace AI.
 
-This module provides reproducible, clinically valid data augmentation transforms
-specifically tailored for digital retinal fundus photography, alongside class balancing
-and weighting utilities.
+The notebook's Keras layers are the authoritative training augmentation pipeline.
+This module is a separate optional utility and is not used by the notebook training path.
 """
 
 from typing import Dict, List, Optional, Tuple, Union
@@ -11,22 +10,18 @@ import cv2
 
 
 class FundusAugmentor:
-    """Clinical fundus image data augmentation pipeline.
-    
-    Transforms are designed to simulate natural biological variability and real-world
-    acquisition artifacts while strictly preserving the integrity of retinal pathology
-    (microaneurysms, hemorrhages, exudates, and neovascular nets).
+    """Optional fundus image transforms; label and lesion preservation are not guaranteed.
     """
 
     def __init__(
         self,
-        rotation_range: Tuple[float, float] = (-180.0, 180.0),
+        rotation_range: Tuple[float, float] = (-19.8, 19.8),
         horizontal_flip_prob: float = 0.5,
         vertical_flip_prob: float = 0.5,
         zoom_range: Tuple[float, float] = (0.90, 1.10),
         brightness_range: Tuple[float, float] = (0.85, 1.15),
         contrast_range: Tuple[float, float] = (0.85, 1.15),
-        coarse_dropout_prob: float = 0.3,
+        coarse_dropout_prob: float = 0.0,
         num_dropout_holes: int = 4,
         max_dropout_size: int = 16,
         seed: Optional[int] = None,
@@ -43,7 +38,7 @@ class FundusAugmentor:
         self.rng = np.random.default_rng(seed)
 
     def random_rotate(self, img: np.ndarray) -> np.ndarray:
-        """Apply arbitrary planar rotation [-180, 180] degrees.
+        """Apply planar rotation within the configured degree range.
         
         Clinical Justification: Fundus photographs have circular rotational symmetry;
         patient head tilt and camera angle orientation do not alter the diagnostic stage.
@@ -55,11 +50,7 @@ class FundusAugmentor:
         return cv2.warpAffine(img, matrix, (w, h), borderMode=cv2.BORDER_REFLECT)
 
     def random_flip(self, img: np.ndarray) -> np.ndarray:
-        """Apply horizontal and vertical reflections.
-        
-        Clinical Justification: Retinal microvascular lesions have no fixed left/right
-        or top/bottom orientation. Reflections double and quadruple sample variety
-        without introducing morphological artifacts.
+        """Apply configured horizontal and vertical reflections.
         """
         if self.rng.random() < self.horizontal_flip_prob:
             img = cv2.flip(img, 1)
@@ -97,16 +88,15 @@ class FundusAugmentor:
         voltage, pupil dilation quality, and lens transmission properties.
         """
         alpha = self.rng.uniform(self.contrast_range[0], self.contrast_range[1])
-        beta = self.rng.uniform(self.brightness_range[0] - 1.0, self.brightness_range[1] - 1.0) * 128.0
-        adjusted = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
-        return adjusted
+        beta = self.rng.uniform(
+            self.brightness_range[0] - 1.0,
+            self.brightness_range[1] - 1.0,
+        ) * 255.0
+        adjusted = img.astype(np.float32) * alpha + beta
+        return np.clip(adjusted, 0, 255).astype(img.dtype)
 
     def random_coarse_dropout(self, img: np.ndarray) -> np.ndarray:
-        """Apply small random occlusion patches.
-        
-        Clinical Justification: Simulates minor dust particles on camera lenses or
-        intermittent eyelash shadows, forcing convolutional filters to learn distributed
-        lesion patterns rather than relying on a single localized feature.
+        """Apply optional random occlusion patches when coarse dropout is enabled.
         """
         if self.rng.random() >= self.coarse_dropout_prob:
             return img

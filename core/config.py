@@ -27,26 +27,27 @@ class AppConfig:
 
     # ── Centralized Training & Hyperparameter Configuration ─────────
     # Phase 1: Transfer Learning Feature Extraction (Frozen Backbone)
-    PHASE1_EPOCHS: int = 10
+    PHASE1_EPOCHS: int = 15
     PHASE1_LR: float = 1e-3
     PHASE1_BATCH_SIZE: int = 32
     PHASE1_OPTIMIZER: str = "Adam(learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-7)"
-    PHASE1_FROZEN_LAYERS: int = 384  # Full EfficientNetB3 backbone frozen
+    PHASE1_FROZEN_LAYERS: int = 384  # Full EfficientNetB3 backbone (verified layer count)
 
     # Phase 2: End-to-End Fine-Tuning (Top Stages Unfrozen)
     PHASE2_EPOCHS: int = 25
-    PHASE2_LR: float = 1e-4
-    PHASE2_MIN_LR: float = 1e-6
-    PHASE2_BATCH_SIZE: int = 16
-    PHASE2_OPTIMIZER: str = "Adam(learning_rate=1e-4, decay=cosine_decay)"
-    PHASE2_UNFROZEN_LAYERS: int = 65  # Top blocks (block7, block6, top_conv) unfrozen
+    PHASE2_LR: float = 1e-5
+    PHASE2_MIN_LR: float = 1e-7
+    PHASE2_BATCH_SIZE: int = 32
+    PHASE2_OPTIMIZER: str = "Adam(learning_rate=1e-5)"
+    PHASE2_UNFROZEN_LAYERS: int = 30  # Matches the notebook's current fine-tuning policy
 
     # Regularization & Optimization Guardrails
     DROPOUT_RATE: float = 0.30
+    # Reserved; the notebook training path currently does not apply weight decay.
     L2_WEIGHT_DECAY: float = 1e-4
-    LABEL_SMOOTHING: float = 0.05
+    LABEL_SMOOTHING: float = 0.1
     EARLY_STOPPING_PATIENCE: int = 5
-    REDUCE_LR_PATIENCE: int = 2
+    REDUCE_LR_PATIENCE: int = 3
     REDUCE_LR_FACTOR: float = 0.50
 
     WEIGHTS_PATH: str = str(PROJECT_ROOT / "checkpoints" / "best_phase2.weights.h5")

@@ -19,7 +19,11 @@ def build_classifier():
         input_shape=(AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3),
     )
     inputs = keras.Input(shape=(AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3))
-    x = base_m(inputs, training=False)
+    # preprocess_image returns float32 pixels in [0, 1]. EfficientNet's
+    # application model includes its own 1/255 rescaling layer, so restore
+    # the documented [0, 255] input range before calling the backbone.
+    x = layers.Rescaling(255.0, name="restore_efficientnet_input_range")(inputs)
+    x = base_m(x, training=False)
     x = layers.GlobalAveragePooling2D(name="gap")(x)
     x = layers.BatchNormalization(name="head_bn")(x)
     x = layers.Dense(256, activation="relu", name="head_dense")(x)
@@ -42,7 +46,8 @@ def build_gradcam_model(full_model, base_model):
     conv_layer = base_model.get_layer("top_activation")
     base_sub = keras.Model(inputs=base_model.inputs, outputs=[conv_layer.output, base_model.output])
     cam_in = keras.Input(shape=(AppConfig.IMG_SIZE, AppConfig.IMG_SIZE, 3))
-    conv_output, base_output = base_sub(cam_in)
+    scaled_cam_in = layers.Rescaling(255.0, name="gradcam_restore_efficientnet_input_range")(cam_in)
+    conv_output, base_output = base_sub(scaled_cam_in)
     x = full_model.get_layer("gap")(base_output)
     x = full_model.get_layer("head_bn")(x)
     x = full_model.get_layer("head_dense")(x)

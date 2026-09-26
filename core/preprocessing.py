@@ -47,17 +47,15 @@ def ben_graham_enhance(img: np.ndarray) -> np.ndarray:
 
 
 def denoise_fundus(img: np.ndarray, diameter: int = 5, sigma_color: float = 20.0, sigma_space: float = 20.0) -> np.ndarray:
-    """Apply conservative edge-preserving bilateral filtering before enhancement.
-    
-    Preserves fine retinal vessel boundaries and microaneurysms while smoothing
-    sensor noise and compression artifacts.
-    """
-    if img.ndim == 2:
-        return cv2.bilateralFilter(img, diameter, sigma_color, sigma_space)
+    """Apply bilateral smoothing; preservation of individual lesions is unverified."""
     return cv2.bilateralFilter(img, diameter, sigma_color, sigma_space)
 
 
-def apply_clahe(img: np.ndarray, clip_limit: float = 2.0, tile_grid_size: tuple = (8, 8)) -> np.ndarray:
+def apply_clahe(
+    img: np.ndarray,
+    clip_limit: float = AppConfig.CLAHE_CLIP_LIMIT,
+    tile_grid_size: tuple = AppConfig.CLAHE_GRID_SIZE,
+) -> np.ndarray:
     """Apply Contrast-Limited Adaptive Histogram Equalization (CLAHE).
     
     For RGB images, operates in the CIELAB color space on the Luminance (L) channel
@@ -74,12 +72,12 @@ def apply_clahe(img: np.ndarray, clip_limit: float = 2.0, tile_grid_size: tuple 
     return img
 
 
-def enhance_edges(img: np.ndarray, strength: float = 1.2, sigma: float = 3.0) -> np.ndarray:
-    """Apply high-boost unsharp masking to sharpen microvascular and lesion boundaries.
-    
-    Subtracts a low-pass Gaussian blur to isolate high-frequency edge gradients,
-    enhancing subtle microaneurysms and exudate boundaries against the fundus background.
-    """
+def enhance_edges(
+    img: np.ndarray,
+    strength: float = AppConfig.EDGE_SHARPEN_STRENGTH,
+    sigma: float = AppConfig.EDGE_SHARPEN_SIGMA,
+) -> np.ndarray:
+    """Apply high-boost unsharp masking; this may also amplify noise and artifacts."""
     blurred = cv2.GaussianBlur(img, (0, 0), sigmaX=sigma)
     sharpened = cv2.addWeighted(img, 1.0 + strength, blurred, -strength, 0)
     return np.clip(sharpened, 0, 255).astype(np.uint8)
