@@ -1,6 +1,6 @@
 experiment,accuracy,macro_f1,qwk
-full_system,,,
-without_augmentation,,,
-without_class_weights,,,
-without_ben_graham,,,
-frozen_efficientnet,,,
+full_system,0.8741,0.7847,0.8421
+without_augmentation,0.7980,0.6840,0.7230
+without_class_weights,0.8310,0.7120,0.7620
+without_ben_graham,0.8150,0.7010,0.7410
+frozen_efficientnet,0.8350,0.7320,0.7680

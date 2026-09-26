@@ -1,4 +1,4 @@
-"""Advanced Computer Vision Analysis Modules for RetinaGuard AI.
+"""Advanced Computer Vision Analysis Modules for RetinaTrace AI.
 
 Includes:
 1. Lesion-Grad-CAM Overlap Analysis (AI Attention-Lesion Agreement)

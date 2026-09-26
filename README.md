@@ -1,5 +1,5 @@
 ---
-title: RetinaGuard AI - Diabetic Retinopathy Clinical Decision Support
+title: RetinaTrace AI - Diabetic Retinopathy Clinical Decision Support
 emoji: 👁️
 colorFrom: teal
 colorTo: blue

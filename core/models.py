@@ -1,4 +1,4 @@
-"""Model construction and checkpoint loading for RetinaGuard AI."""
+"""Model construction and checkpoint loading for RetinaTrace AI."""
 
 import os
 
