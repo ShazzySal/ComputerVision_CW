@@ -183,7 +183,7 @@ The Kaggle listing identifies the combined package as CC0, but licensing, consen
 Non-mydriatic fundus cameras (Canon CR-2, Topcon NW400) use a modified ophthalmoscope with an annular illumination ring to achieve co-axial illumination without pupil dilation, enabling mass screening. The Gullstrand optical principle focuses the illumination beam around the pupil margin while collecting reflected light through the pupil center, achieving a 45° field of view. Image sensors are 3-CCD or CMOS arrays (Sony IMX series) with 12–16 MP resolution, capturing a spectral range of 400–700 nm. Pixel depth is typically 12-bit RAW before display conversion.
 
 **Display — DICOM GSDF Calibration:**
-Medical-grade displays used for DR grading (e.g., Barco Nio 5MP, NEC MultiSync MD211G5) conform to DICOM Part 14 Grayscale Standard Display Function (GSDF), which corrects for the human visual system's perceptual non-linearity. The GSDF maps stored pixel values through a Just Noticeable Difference (JND) function, ensuring perceptually uniform luminance steps across the 0.05–3500 cd/m² display range — critical for detecting subtle dot hemorrhage contrast differences between Stages 1 and 2.
+Medical-grade displays used for DR grading (e.g., Barco Nio 5MP, NEC MultiSync MD211G5) conform to DICOM Part 14 Grayscale Standard Display Function (GSDF) (National Electrical Manufacturers Association [NEMA], 2022), which corrects for the human visual system's perceptual non-linearity. The GSDF maps stored pixel values through a Just Noticeable Difference (JND) function, ensuring perceptually uniform luminance steps across the 0.05–3500 cd/m² display range — critical for detecting subtle dot hemorrhage contrast differences between Stages 1 and 2.
 
 **Transmission — DICOM and Tele-Ophthalmology:**
 In a clinical tele-ophthalmology deployment, fundus images may be encapsulated in DICOM (Digital Imaging and Communications in Medicine) containers with structured acquisition metadata. Lossless or carefully controlled compression can reduce added image artifacts, while encrypted transport such as TLS helps protect data in transit. Encryption alone does not establish GDPR compliance; that also depends on lawful data handling, access controls, retention, and governance. This coursework prototype processes local research images and does not implement a DICOM transport or clinical data-transfer service. Lossy compression can introduce artifacts at lesion boundaries, so the quality and provenance of source images remain relevant limitations.
@@ -658,7 +658,7 @@ In medical AI, overconfident hallucinations on out-of-distribution or ambiguous 
 ## 8. Practical Impact, Ethical AI, Limitations & Future Scope
 
 ### 8.1 Real-World Clinical Impact and Healthcare Triage Feasibility
-Worldwide, over 530 million individuals live with diabetes, all requiring annual retinal examinations. However, developing nations face severe ophthalmologist shortages (e.g. fewer than 1 specialist per 100,000 population in rural areas). This work demonstrates a credible prototype for assistive screening rather than autonomous clinical diagnosis:
+Worldwide, over 530 million individuals live with diabetes, all requiring annual retinal examinations (International Diabetes Federation [IDF], 2021). However, developing nations face severe ophthalmologist shortages — fewer than 1 specialist per 100,000 population in many rural regions (World Health Organization [WHO], 2023). This work demonstrates a credible prototype for assistive screening rather than autonomous clinical diagnosis:
 - Operates on standard desktop hardware or cloud servers.
 - Establishes a reproducible image-processing and deep-learning pipeline for retinal grading.
 - Can support triage workflows by identifying likely normal cases and prioritizing suspicious disease stages for human review.
@@ -724,8 +724,10 @@ At the same time, the project should be interpreted as a rigorous academic proto
 - Harsha. (2020). *Combined diabetic retinopathy dataset (APTOS, IDRiD, Messidor-2, EyePACS)* [Data set]. Kaggle. https://www.kaggle.com/datasets/harsha1289/combined-dr-dataset-aptosidridmessidoreyepacs
 - He, K., Zhang, X., Ren, S., & Sun, J. (2016). Deep residual learning for image recognition. In *2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)* (pp. 770–778). IEEE. https://doi.org/10.1109/CVPR.2016.90
 - Huang, G., Liu, Z., van der Maaten, L., & Weinberger, K. Q. (2017). Densely connected convolutional networks. In *2017 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)* (pp. 4700–4708). IEEE. https://doi.org/10.1109/CVPR.2017.243
+- International Diabetes Federation. (2021). *IDF diabetes atlas* (10th ed.). IDF. https://www.diabetesatlas.org
 - Klette, R. (2014). *Concise computer vision: An introduction into theory and algorithms*. Springer.
 - Landis, J. R., & Koch, G. G. (1977). The measurement of observer agreement for categorical data. *Biometrics*, 33(1), 159–174. https://doi.org/10.2307/2529310
+- National Electrical Manufacturers Association. (2022). *Digital imaging and communications in medicine (DICOM) Part 14: Grayscale standard display function* (PS3.14). NEMA. https://www.dicomstandard.org/current
 - PyTorch Contributors. (n.d.). *DenseNet-121 IMAGENET1K_V1 weights*. TorchVision documentation. https://docs.pytorch.org/vision/stable/models/generated/torchvision.models.densenet121.html
 - PyTorch Contributors. (n.d.). *MobileNetV2 IMAGENET1K_V1 weights*. TorchVision documentation. https://docs.pytorch.org/vision/stable/models/generated/torchvision.models.mobilenet_v2.html
 - PyTorch Contributors. (n.d.). *ResNet-50 IMAGENET1K_V1 weights*. TorchVision documentation. https://docs.pytorch.org/vision/stable/models/generated/torchvision.models.resnet50.html
@@ -735,3 +737,5 @@ At the same time, the project should be interpreted as a rigorous academic proto
 - Szeliski, R. (2022). *Computer vision: Algorithms and applications* (2nd ed.). Springer.
 - Tan, M., & Le, Q. V. (2019). EfficientNet: Rethinking model scaling for convolutional neural networks. In *International Conference on Machine Learning (ICML)* (pp. 6105–6114). PMLR.
 - Wilkinson, C. P., Ferris, F. L., Klein, R. E., Lee, P. P., Agardh, C. D., Davis, M., Dills, D., Kampik, A., Pararajasegaram, R., & Verdaguer, J. T. (2003). Proposed international clinical diabetic retinopathy and diabetic macular edema disease severity scales. *Ophthalmology*, 110(9), 1677–1682. https://doi.org/10.1016/S0161-6420(03)00475-5
+- World Health Organization. (2023). *World report on vision*. WHO. https://www.who.int/publications/i/item/9789241516570
+
