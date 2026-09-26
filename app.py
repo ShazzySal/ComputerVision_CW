@@ -499,7 +499,7 @@ def calculate_multimodal_risk(stage: int = 2, hba1c: float = 7.5, duration_years
     """Computes evidence-based 10-year vision loss progression risk and NHS hospital triage dispatch routing (UKPDS/WESDR)."""
     try:
         stage = int(stage) if stage is not None else 2
-    except Exception:
+    except (ValueError, TypeError):
         stage = 2
 
     # Base stage risk (10-year baseline from UKPDS 33 / WESDR epidemiological cohorts)
@@ -1270,7 +1270,7 @@ def compare_longitudinal_images(previous: Optional[np.ndarray], current: Optiona
             previous_result["explanation"],
             current_result["explanation"],
         )
-    except Exception as exc:
+    except (ValueError, KeyError, RuntimeError, cv2.error) as exc:
         return f"<div class='card warning-card'>Reliable comparison could not be established: {exc}</div>", empty_img
 
     registration = "Reliable spatial registration established." if comparison["registration_reliable"] else "Reliable spatial comparison could not be established. Metric changes are non-spatial visual comparisons."
@@ -3110,7 +3110,7 @@ with gr.Blocks(title="RetinaTrace — DR Research Prototype") as demo:
             try:
                 top_name = max(prob_dict, key=prob_dict.get)
                 st = stage_map.get(top_name, 2)
-            except Exception:
+            except (KeyError, ValueError, TypeError):
                 st = 2
         return calculate_multimodal_risk(st, hba1c, duration, age, bp, d_type)
 

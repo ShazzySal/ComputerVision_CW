@@ -1,6 +1,6 @@
 """Fundus image preprocessing utilities."""
 
-from typing import Union
+from typing import Optional, Union
 
 import cv2
 import numpy as np
@@ -32,10 +32,11 @@ def crop_image_from_gray(img: np.ndarray, threshold: int = 7, tol: int = 7) -> n
     return cropped if cropped.size > 0 and min(cropped.shape[:2]) >= 10 else img
 
 
-def ben_graham_enhance(img: np.ndarray) -> np.ndarray:
+def ben_graham_enhance(img: np.ndarray, sigma: Optional[float] = None) -> np.ndarray:
     """Apply Ben Graham spatial illumination normalization."""
-    ksize = int(2 * round(4 * AppConfig.BEN_GRAHAM_SIGMA) + 1)
-    blurred = cv2.GaussianBlur(img, (ksize, ksize), AppConfig.BEN_GRAHAM_SIGMA)
+    actual_sigma = float(sigma) if sigma is not None else AppConfig.BEN_GRAHAM_SIGMA
+    ksize = int(2 * round(4 * actual_sigma) + 1)
+    blurred = cv2.GaussianBlur(img, (ksize, ksize), actual_sigma)
     enhanced = cv2.addWeighted(
         img,
         AppConfig.BEN_GRAHAM_ALPHA,
@@ -85,22 +86,26 @@ def enhance_edges(
 
 def preprocess_image(
     image_input: Union[str, np.ndarray],
+    img_size: Optional[int] = None,
+    apply_ben_graham: bool = True,
     apply_denoise: bool = False,
     apply_clahe_enhancement: bool = False,
     apply_edge_enhancement: bool = False,
 ) -> np.ndarray:
-    """Convert an input image into a normalized 224x224 RGB tensor.
+    """Convert an input image into a normalized RGB tensor.
     
     Applies the comprehensive medical preprocessing pipeline:
     1. Color-space standardization (RGBA/Gray -> RGB)
     2. Circular dark border cropping
-    3. Scale-adaptive interpolation resizing (224x224)
+    3. Scale-adaptive interpolation resizing (target size, default: AppConfig.IMG_SIZE=224)
     4. Optional bilateral edge-preserving denoising
     5. Optional CLAHE contrast-limited adaptive histogram equalization
     6. Optional high-boost unsharp mask edge enhancement
-    7. Ben Graham spatial color/illumination normalization
+    7. Ben Graham spatial color/illumination normalization (if apply_ben_graham=True)
     8. Intensity normalization to [0.0, 1.0] float32
     """
+    target_size = int(img_size) if img_size is not None else AppConfig.IMG_SIZE
+
     if isinstance(image_input, str):
         bgr = cv2.imread(image_input)
         if bgr is None:
@@ -130,13 +135,18 @@ def preprocess_image(
         raise ValueError(f"Image crop produced an empty result: {cropped.shape}.")
 
     h, w = cropped.shape[:2]
-    interp = cv2.INTER_AREA if h > AppConfig.IMG_SIZE or w > AppConfig.IMG_SIZE else cv2.INTER_LINEAR
-    resized = cv2.resize(cropped, (AppConfig.IMG_SIZE, AppConfig.IMG_SIZE), interpolation=interp)
+    interp = cv2.INTER_AREA if (h > target_size or w > target_size) else cv2.INTER_LINEAR
+    resized = cv2.resize(cropped, (target_size, target_size), interpolation=interp)
     if apply_denoise:
         resized = denoise_fundus(resized)
     if apply_clahe_enhancement:
         resized = apply_clahe(resized)
     if apply_edge_enhancement:
         resized = enhance_edges(resized)
-    enhanced = ben_graham_enhance(resized)
+    
+    if apply_ben_graham:
+        enhanced = ben_graham_enhance(resized)
+    else:
+        enhanced = resized
+
     return enhanced.astype(np.float32) / 255.0

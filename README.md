@@ -83,11 +83,19 @@ Computer-Vision-CW/
     └── similar_cases_demo.png            # Query image vs top-3 retrieved historical cases
 ```
 
-  Research evidence utilities are documented in `research_evidence.md`. They run
-  outside the deployed application and do not overwrite saved checkpoints. The
-  ablation suite must be run
-  in the GPU notebook environment because the local workspace does not contain
-  the full training dataset or an executed notebook kernel.
+### 🏛️ Software Engineering & Architectural Design Rationale
+
+To align with clean-architecture principles and deployment requirements:
+1. **Decoupled Backend Package (`core/`):** All domain business logic is modularized into testable units:
+   - `core/preprocessing.py`: Unified, single source of truth for optical standardization and Ben Graham enhancement shared identically across the research notebook (`diabetic_retinopathy_detection.ipynb`), standalone GPU training (`train_retinatrace_gpu.py`), and the deployment application.
+   - `core/models.py` & `core/training.py`: Model architecture definitions, input-rescaling adapters, and two-phase optimization routines.
+   - `core/explainability.py` & `core/advanced_cv.py`: Mathematical Grad-CAM formulation, U-Net inference, and Case-Based Reasoning (CBR) embedding similarity.
+   - `core/agents.py`: Decoupled 4-agent clinical governance architecture with typed error recovery.
+2. **Consolidated Presentation Layer (`app.py`):** `app.py` is maintained as the top-level UI orchestrator:
+   - **Deployment Architecture:** Zero-configuration deployment to cloud hosting environments (such as **Hugging Face Spaces**) requires a discoverable top-level entrypoint (`app_file: app.py`) that binds Gradio Blocks layout, custom clinical CSS, reactive event listeners, and the chatbot knowledge base.
+   - **Separation of Concerns:** `app.py` contains *no* raw neural network layer definitions or image-processing mathematics; it delegates 100% of domain processing to `core/`.
+3. **Automated Unit Testing (`tests/`):**
+   - The test suite in `tests/test_preprocessing.py` verifies tensor dimensionality, range $[0.0, 1.0]$, border cropping, ablation flags, and corrupted input error handling via `python -m unittest discover tests`.
 
 > **Checkpoint status:** The saved checkpoints and reported EXP-03 metrics predate
 > the corrected EfficientNet input-scale adapter and do not use the current

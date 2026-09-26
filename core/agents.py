@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 
 import cv2
 import numpy as np
+import tensorflow as tf
 
 from core.config import AppConfig
 from core.explainability import (
@@ -39,20 +40,20 @@ class ExplainabilityAgent:
         stage = diagnosis["stage"]
         try:
             heatmap = compute_gradcam(preproc_img, stage)
-        except Exception:
+        except (tf.errors.OpError, ValueError, RuntimeError):
             heatmap = np.zeros((7, 7), dtype=np.float32)
 
         quadrant_desc, quadrant_scores, peak_quadrant, peak_value = generate_quadrant_description(heatmap, stage)
 
         try:
             lesion_segmentation, lesion_pct, raw_mask = segment_retinal_lesions_with_mask(preproc_img, heatmap, stage)
-        except Exception:
+        except (tf.errors.OpError, cv2.error, ValueError, RuntimeError):
             base = (np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8)
             lesion_segmentation, lesion_pct, raw_mask = base, 0.0, None
 
         try:
             vessel_analysis = extract_retinal_vessels(preproc_img)
-        except Exception:
+        except (cv2.error, ValueError, TypeError, RuntimeError):
             vessel_analysis = {
                 "vessel_mask": np.zeros((AppConfig.IMG_SIZE, AppConfig.IMG_SIZE), dtype=np.uint8),
                 "vessel_overlay": (np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8),
@@ -62,7 +63,7 @@ class ExplainabilityAgent:
             }
         try:
             optic_disc = localize_optic_disc(preproc_img)
-        except Exception:
+        except (cv2.error, ValueError, TypeError, RuntimeError):
             optic_disc = {
                 "optic_disc_found": False,
                 "optic_disc_overlay": (np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8),
@@ -78,7 +79,7 @@ class ExplainabilityAgent:
         # 1. Feature 1: Lesion-Grad-CAM Overlap Analysis (Agreement)
         try:
             overlap_analysis = analyze_attention_lesion_agreement(preproc_img, heatmap, raw_mask, stage)
-        except Exception:
+        except (ValueError, cv2.error, ZeroDivisionError, RuntimeError):
             overlap_analysis = {"iou": 0.0, "dice": 0.0, "lesion_in_cam_pct": 0.0,
                                 "interpretation": "Overlap analysis unavailable.", "agreement_level": "Insufficient evidence",
                                 "combined_vis": (np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8)}
@@ -86,7 +87,7 @@ class ExplainabilityAgent:
         # 2. Feature 2: Retinal Severity Map (4 Anatomical Quadrants)
         try:
             severity_map = compute_retinal_severity_map(preproc_img, lesion_binary, vessel_analysis.get("vessel_mask"), heatmap)
-        except Exception:
+        except (ValueError, KeyError, cv2.error, RuntimeError):
             severity_map = {"quadrants": {}, "affected_quadrants_count": 0, "total_lesion_count": 0,
                             "quadrant_overlay": (np.clip(preproc_img, 0.0, 1.0) * 255).astype(np.uint8)}
 
